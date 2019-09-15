@@ -613,7 +613,6 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
             draw.polygon()
                 .points(points)
                 .hsv(hue, 1.0, 0.5)
-
             /*.rotate(-t * 0.1)*/;
         }
 
