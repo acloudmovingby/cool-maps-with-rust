@@ -108,15 +108,8 @@ fn main() {
 
 struct Model {
     _window: window::Id,
-    nodes: HashMap<NodeId, Node, RandomState>,
     buildings: Vec<Vec<Point2>>, // each Vec represents a closed path of points describing the perimeter of the building
-    road_graph: Graph<Node, f32, Directed>,
-    path_to_cursor: Vec<Line>,
     road_lines: Vec<Line>, // Line stores start, end, hue, saturation, alpha, thickness
-    start: NodeIndex,      // the path goes from the mouse cursor to here
-    target: Point2,
-    closest_road_point: Point2,
-    police_sts: Vec<Vec<Point2>>,
 }
 
 fn model(app: &App) -> Model {
@@ -130,7 +123,7 @@ fn model(app: &App) -> Model {
     let t1 = Instant::now();
 
     let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+    //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
 
     let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
     let mut pbf = osmpbfreader::OsmPbfReader::new(r);
@@ -140,93 +133,38 @@ fn model(app: &App) -> Model {
     let mut police_sts = Vec::new(); // police stations
     let mut all_roads: Vec<Way> = Vec::new();
 
-    // TESTING
-    let mut node_time = 0;
-    let mut way_time = 0;
-    let mut num_nodes = 0;
-    let mut num_ways = 0;
-    let mut num_way_nodes = 0;
-    // TESTING
-
-    println!("t1 before reading map data {}", t1.elapsed().as_secs());
-
     // READING MAP DATA
     for obj in pbf.par_iter().map(Result::unwrap) {
         match obj {
             osmpbfreader::OsmObj::Node(node) => {
-                num_nodes += 1;
 
-                let start = Instant::now();
 
                 // this takes a long time, could possibly avoid by storing just the coordinates, not the full node object?
                 //nodes.insert(node.id, node);
                 if is_in_outer_bounds(&node) {
                     nodes.insert(node.id, node);
                 }
-
-                node_time += start.elapsed().as_micros();
             }
             osmpbfreader::OsmObj::Way(way) => {
-                num_ways += 1;
-                num_way_nodes += way.nodes.len();
-                let start = Instant::now();
-                if way.tags.contains("amenity", "police") {
-                    police_sts.push(way.nodes.clone());
-                }
                 if way.tags.contains_key("building") {
                     building_node_ids.push(way.nodes);
                 } else if way.tags.contains_key("highway") {
                     all_roads.push(way);
                 }
-                way_time += start.elapsed().as_micros();
             }
             osmpbfreader::OsmObj::Relation(rel) => {}
         }
     }
 
-    println!(
-        "The time spent on 'nodes' was {} seconds and on 'ways' was {} seconds.",
-        node_time / 1_000_000,
-        way_time / 1_000_000
-    );
-    println!(
-        "The number of nodes was {}, the number of ways was {}, the number of way-nodes was {}.",
-        num_nodes, num_ways, num_way_nodes
-    );
-    let nodes = nodes; // just reassign it so it's no longer mutable (is this good practice?)
-    println!("police_sts len is {}", police_sts.len());
-    println!("number of buildings is {}", building_node_ids.len());
     let building_paths: Vec<Vec<Point2>> = node_ids_to_pts(building_node_ids, &nodes);
-    println!(
-        "number of buildings after converting points is {}",
-        building_paths.len()
-    );
     //let building_paths: Vec<Vec<Point2>> = level_of_detail(1.0, building_paths);
-    let police_sts = node_ids_to_pts(police_sts, &nodes);
-    println!("police_sts len after converting it is {}", police_sts.len());
 
-    println!("t1 after making the buildings: {}", t1.elapsed().as_secs());
-    let _building_coordinates = building_paths;
+    let buildings = building_paths;
     // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
     // roads thus represents all the Ways that have at least one node in the map bounds
     let mut roads: Vec<Way> = Vec::new();
     for road in all_roads {
-        // TESTING
-        for node_id in road.nodes.iter() {
-            if nodes.contains_key(node_id) {
-                let node = nodes.get(node_id).unwrap();
-                if node.id.0 == 201212493 {
-                    println!("#3 in roads Found left most, 201212493");
-                }
-                if node.id.0 == 201212498 {
-                    println!("#3 in roads Found center, 201212498");
-                }
-                if node.id.0 == 201212502 {
-                    println!("#3 in roads Found right, 201212502");
-                }
-            }
-        }
-        // END TESTING
+
         let any_in_bounds = road.nodes.iter().any(|node_id| {
             if nodes.contains_key(node_id) {
                 let node = nodes.get(node_id).unwrap();
@@ -241,16 +179,7 @@ fn model(app: &App) -> Model {
             roads.push(road);
         }
     }
-    println!("t1 after making the roads: {}", t1.elapsed().as_secs());
-    // testing
-    let mut on_map = 0;
-    let mut off_map = 0;
-    // end testing
-
-    // TESTING
-    let mut target = pt2(0.0, 0.0);
-    // END TESTING
-
+    
     // BULD GRAPH
     // make hashmap of node ids to node indices
     // before adding a node, check to see if it exists
@@ -503,7 +432,7 @@ fn model(app: &App) -> Model {
     Model {
         _window,
         nodes,
-        buildings: _building_coordinates,
+        buildings: buildings,
         road_graph,
         path_to_cursor,
         road_lines,
@@ -598,23 +527,22 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let t = app.time;
 
 
-        for building in &model.buildings {
-            let mut points: Vec<Point2> = Vec::new();
+    for building in &model.buildings {
+        let mut points: Vec<Point2> = Vec::new();
 
-            for node in building {
-                let x = node.clone();
-                points.push(node.clone());
-            }
-            // just draws the first point as a small ellipse (with oscillating hue)
-            let oscillator = map_range(t.cos(), -1.0, 1.0, 0.0, 1.0);
-            let area = polygon_area(&points).min(150.0);
-
-            let hue = map_range(area, 15.0,150.0, 0.0,0.6);
-            draw.polygon()
-                .points(points)
-                .hsv(hue, 1.0, 0.5)
-            /*.rotate(-t * 0.1)*/;
+        for node in building {
+            points.push(node.clone());
         }
+
+        let oscillator = map_range(t.cos(), -1.0, 1.0, 0.0, 1.0);
+        let area = polygon_area(&points).min(150.0);
+
+        let hue = map_range(area, 15.0,150.0, 0.0,0.6);
+        draw.polygon()
+            .points(points)
+            .hsv(hue, 1.0, 0.5)
+        /*.rotate(-t * 0.1)*/;
+    }
 
     // DRAW POLICE STATIONS
     /*
@@ -802,7 +730,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
         .color(YELLOW);*/
     // Clear the background to pink.
 
-    
+
     draw.background().hsv(0.73, 0.55, 0.06);
     // Write to the window frame.
     draw.to_frame(app, &frame).unwrap();
@@ -926,7 +854,7 @@ fn djikstra_float(
     if g.node_weight(start).is_some() {
         let mut min_dist: HashMap<NodeIndex, f32, RandomState>; // final return value; maps node indices to their min distance from the start
         let mut edge_dist: BinaryHeap<Dist_Float>; // potential edges to explore; each Dist stores a node and a distance leading up to that node (which may not be the min distance)
-                                                   // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
+        // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
 
         // initialize min_dist
         min_dist = HashMap::new();
