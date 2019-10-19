@@ -2,7 +2,6 @@ use nannou::prelude::*;
 use ordered_float::OrderedFloat;
 use osmpbfreader::{Node, NodeId, Way};
 use petgraph::algo::astar;
-use petgraph::data::ElementIterator;
 use petgraph::graph::NodeIndex;
 use petgraph::graph::*;
 use petgraph::prelude::*;
@@ -12,7 +11,6 @@ use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
-use std::f32::MAX;
 use std::time::Instant;
 
 // AROUND MY HOUSE
@@ -212,22 +210,6 @@ fn model(app: &App) -> Model {
     // roads thus represents all the Ways that have at least one node in the map bounds
     let mut roads: Vec<Way> = Vec::new();
     for road in all_roads {
-        // TESTING
-        for node_id in road.nodes.iter() {
-            if nodes.contains_key(node_id) {
-                let node = nodes.get(node_id).unwrap();
-                if node.id.0 == 201212493 {
-                    println!("#3 in roads Found left most, 201212493");
-                }
-                if node.id.0 == 201212498 {
-                    println!("#3 in roads Found center, 201212498");
-                }
-                if node.id.0 == 201212502 {
-                    println!("#3 in roads Found right, 201212502");
-                }
-            }
-        }
-        // END TESTING
         let any_in_bounds = road.nodes.iter().any(|node_id| {
             if nodes.contains_key(node_id) {
                 let node = nodes.get(node_id).unwrap();
@@ -598,7 +580,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let draw = app.draw();
     let t = app.time;
 
-
+/*
         for building in &model.buildings {
             let mut points: Vec<Point2> = Vec::new();
 
@@ -614,7 +596,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
                 .points(points)
                 .hsv(hue, 1.0, 0.5)
             /*.rotate(-t * 0.1)*/;
-        }
+        }*/
 
     // DRAW POLICE STATIONS
     /*
@@ -673,12 +655,13 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     }*/
 
     // DRAW ROAD NODES FROM ROAD_GRAPH
+    /*
     println!("num nodes: {}",model.road_graph.raw_nodes().len());
     model.road_graph.raw_nodes().iter().map(|node| {
         println!("hey");
         let pt = convert_coord2(&node.weight);
         draw.ellipse().x(pt.x).y(pt.y).color(GREEN).radius(0.25);
-    });
+    });*/
 
     //SELECT ROAD NODE CLOSEST MOUSE CURSOR
 
@@ -699,12 +682,12 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
         };*/
 
     // RED ELLIPSE AT CURSOR
-
+/*
     draw.ellipse()
         .x(model.closest_road_point.x)
         .y(model.closest_road_point.y)
         .radius(5.0)
-        .color(RED);
+        .color(RED);*/
 
     /* REAL-TIME PATH DRAWING: */
     /*
@@ -899,7 +882,7 @@ struct Line {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct Dist_Float {
+struct DistFloat {
     dist: OrderedFloat<f32>,
     node: NodeIndex,
 }
@@ -996,4 +979,25 @@ fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
         }
         (area / 2.0).abs()
     }
+}
+
+/**
+Mutates road graph so 4 way intersections don't allow left turns.
+*/
+fn limit_turns_graph(g: &Graph<Node, f32, Directed>) {
+
+    let g_ret = Graph::<&Node, f32, Directed>::new();
+
+    // key is the original 4 way intersection, the value is the 4 separate directions from the intersection represented as distinct nodes
+    let directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
+
+    //
+    for node_ix in g.node_indices() {
+        g_ret.add_node(&g.node_weight(node_ix));
+    }
+
+    for edge_ix in g.raw_edges() {
+        g_ret.add_edge();
+    }
+
 }
