@@ -56,11 +56,11 @@ const MAX_LAT: f64 = 41.8300;
 const MIN_LAT: f64 = 41.8122;*/
 
 // LARGER PROVIDENCE AREA
-
+/*
 const MAX_LON: f64 = -71.2202;
 const MIN_LON: f64 = -71.5340;
 const MAX_LAT: f64 =  41.8831;
-const MIN_LAT: f64 = 41.7403;
+const MIN_LAT: f64 = 41.7403;*/
 
 /*
 const MAX_LON: f64 = -71.36522;
@@ -68,15 +68,29 @@ const MIN_LON: f64 = -71.38602;
 const MAX_LAT: f64 = 41.53705;
 const MIN_LAT: f64 = 41.52632;*/
 
-//SMALL AREA FOR TESTING OF PETGRAPH BUG:
+//Small part of Jamestown, RI
 /*
-const MAX_LON: f64 = -71.36531;
-const MIN_LON: f64 = -71.37021;
-const MAX_LAT: f64 = 41.53379;
-const MIN_LAT: f64 = 41.53155;*/
+const MAX_LON: f64 = -71.3621;
+const MIN_LON: f64 = -71.3820;
+const MAX_LAT: f64 = 41.5028;
+const MIN_LAT: f64 = 41.4938;*/
 
-/* Brown University
-const MAX_LON: f64 = -71.3909;
+// VERY small part of Jamestown, RI
+/*
+const MAX_LON: f64 = -71.36557;
+const MIN_LON: f64 = -71.37553;
+const MAX_LAT: f64 = 41.50079;
+const MIN_LAT: f64 = 41.49631;*/
+
+// random part or RI
+const MAX_LON: f64 = -71.2896;
+const MIN_LON: f64 = -71.3095;
+const MAX_LAT: f64 = 41.5251;
+const MIN_LAT: f64 = 41.5162;
+
+
+//Brown University
+/*const MAX_LON: f64 = -71.3909;
 const MIN_LON: f64 = -71.4105;
 const MAX_LAT: f64 = 41.8282;
 const MIN_LAT: f64 = 41.8192;*/
@@ -129,7 +143,7 @@ fn model(app: &App) -> Model {
     let t1 = Instant::now();
 
     let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+    //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
 
     let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
     let mut pbf = osmpbfreader::OsmPbfReader::new(r);
@@ -627,13 +641,13 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     }
 
     // DRAW PATH TO CURSOR
-    /*
+
     for line in model.path_to_cursor.iter() {
         draw.line()
             .points(line.start, line.end)
             .thickness(line.thickness)
             .hsva(line.hue, line.saturation, 1.0, line.alpha);
-    }*/
+    }
 
     // DRAW START NODE
     /*
@@ -682,12 +696,12 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
         };*/
 
     // RED ELLIPSE AT CURSOR
-/*
+
     draw.ellipse()
         .x(model.closest_road_point.x)
         .y(model.closest_road_point.y)
         .radius(5.0)
-        .color(RED);*/
+        .color(RED);
 
     /* REAL-TIME PATH DRAWING: */
     /*

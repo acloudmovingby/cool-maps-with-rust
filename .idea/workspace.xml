@@ -4,11 +4,7 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types).">
-      <change afterPath="$PROJECT_DIR$/Screenshots/Just buildings and streets (Providence, RI).png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/Path Distance 2 (Providence, RI).png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/Path distance 1 (Jamestown, RI).png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Screenshots/Shading buildings by area (Boston, MA).png" afterDir="false" />
+    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/bin/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/bin/main.rs" afterDir="false" />
     </list>
@@ -26,13 +22,13 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="96">
-              <caret line="884" column="11" lean-forward="true" selection-start-line="884" selection-start-column="11" selection-end-line="884" selection-end-column="11" />
+            <state relative-caret-position="259">
+              <caret line="379" column="29" lean-forward="true" selection-start-line="379" selection-start-column="29" selection-end-line="379" selection-end-column="29" />
               <folding>
-                <element signature="e#2603#2604#0" expanded="true" />
-                <element signature="e#2650#2651#0" expanded="true" />
-                <element signature="e#31382#31383#0" expanded="true" />
-                <element signature="e#31418#31419#0" expanded="true" />
+                <element signature="e#2832#2833#0" expanded="true" />
+                <element signature="e#2879#2880#0" expanded="true" />
+                <element signature="e#30925#30926#0" expanded="true" />
+                <element signature="e#30961#30962#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -134,8 +130,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>WIN_W</find>
-      <find>in_bounds</find>
       <find>size</find>
       <find>building</find>
       <find>astar</find>
@@ -164,6 +158,8 @@
       <find>Graph</find>
       <find>HashM</find>
       <find>Directed&gt;</find>
+      <find>Dist_</find>
+      <find>Dist_Float</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -294,6 +290,21 @@
       <option name="presentableId" value="Default" />
       <updated>1564584800658</updated>
     </task>
+    <task id="LOCAL-00001" summary="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types).">
+      <created>1571516175857</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1571516175862</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Commented out the unfinished implementation of turn-based graph constructor">
+      <created>1571516605519</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1571516605519</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -307,9 +318,9 @@
       <window_info id="UI Designer" order="4" />
       <window_info id="Capture Tool" order="5" />
       <window_info id="Favorites" order="6" side_tool="true" />
-      <window_info active="true" anchor="bottom" id="Messages" visible="true" weight="0.3296501" />
+      <window_info anchor="bottom" id="Messages" weight="0.3296501" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info active="true" anchor="bottom" id="Find" order="1" visible="true" weight="0.3296501" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.3296501" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
@@ -367,7 +378,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types)." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types)." />
+    <MESSAGE value="Commented out the unfinished implementation of turn-based graph constructor" />
+    <option name="LAST_COMMIT_MESSAGE" value="Commented out the unfinished implementation of turn-based graph constructor" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$USER_HOME$/nannou/examples/basics/1_nannou_events.rs">
@@ -596,13 +608,13 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="96">
-          <caret line="884" column="11" lean-forward="true" selection-start-line="884" selection-start-column="11" selection-end-line="884" selection-end-column="11" />
+        <state relative-caret-position="259">
+          <caret line="379" column="29" lean-forward="true" selection-start-line="379" selection-start-column="29" selection-end-line="379" selection-end-column="29" />
           <folding>
-            <element signature="e#2603#2604#0" expanded="true" />
-            <element signature="e#2650#2651#0" expanded="true" />
-            <element signature="e#31382#31383#0" expanded="true" />
-            <element signature="e#31418#31419#0" expanded="true" />
+            <element signature="e#2832#2833#0" expanded="true" />
+            <element signature="e#2879#2880#0" expanded="true" />
+            <element signature="e#30925#30926#0" expanded="true" />
+            <element signature="e#30961#30962#0" expanded="true" />
           </folding>
         </state>
       </provider>
