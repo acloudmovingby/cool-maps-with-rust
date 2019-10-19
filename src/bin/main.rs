@@ -887,8 +887,8 @@ struct DistFloat {
     node: NodeIndex,
 }
 
-impl Ord for Dist_Float {
-    fn cmp(&self, other: &Dist_Float) -> Ordering {
+impl Ord for DistFloat {
+    fn cmp(&self, other: &DistFloat) -> Ordering {
         other
             .dist
             .cmp(&self.dist)
@@ -896,8 +896,8 @@ impl Ord for Dist_Float {
     }
 }
 
-impl PartialOrd for Dist_Float {
-    fn partial_cmp(&self, other: &Dist_Float) -> Option<Ordering> {
+impl PartialOrd for DistFloat {
+    fn partial_cmp(&self, other: &DistFloat) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -909,7 +909,7 @@ fn djikstra_float(
     // check if the node exists in the graph (there is no contains(nodeindex) method in petgraph (why??), so this just retrieves the node's weight as an option and checks if that's None or not)
     if g.node_weight(start).is_some() {
         let mut min_dist: HashMap<NodeIndex, f32, RandomState>; // final return value; maps node indices to their min distance from the start
-        let mut edge_dist: BinaryHeap<Dist_Float>; // potential edges to explore; each Dist stores a node and a distance leading up to that node (which may not be the min distance)
+        let mut edge_dist: BinaryHeap<DistFloat>; // potential edges to explore; each Dist stores a node and a distance leading up to that node (which may not be the min distance)
                                                    // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
 
         // initialize min_dist
@@ -922,7 +922,7 @@ fn djikstra_float(
         // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from start
         let edges_from_start = g.edges_directed(start, Outgoing);
         edge_dist = edges_from_start
-            .map(|edge| Dist_Float {
+            .map(|edge| DistFloat {
                 node: edge.target(),
                 dist: OrderedFloat(*edge.weight()),
             })
@@ -937,8 +937,8 @@ fn djikstra_float(
                 min_dist.insert(next.node, next.dist.into_inner());
 
                 let outgoing = g.edges_directed(next.node, Outgoing);
-                let outgoing: Vec<Dist_Float> = outgoing
-                    .map(|edge| Dist_Float {
+                let outgoing: Vec<DistFloat> = outgoing
+                    .map(|edge| DistFloat {
                         node: edge.target(),
                         dist: OrderedFloat(*edge.weight() + next.dist.into_inner()),
                     })
@@ -981,9 +981,9 @@ fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
     }
 }
 
-/**
+/*
 Mutates road graph so 4 way intersections don't allow left turns.
-*/
+
 fn limit_turns_graph(g: &Graph<Node, f32, Directed>) {
 
     let g_ret = Graph::<&Node, f32, Directed>::new();
@@ -1000,4 +1000,4 @@ fn limit_turns_graph(g: &Graph<Node, f32, Directed>) {
         g_ret.add_edge();
     }
 
-}
+}*/
