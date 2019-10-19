@@ -4,10 +4,7 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/bin/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/bin/main.rs" afterDir="false" />
-    </list>
+    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,8 +19,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="259">
-              <caret line="379" column="29" lean-forward="true" selection-start-line="379" selection-start-column="29" selection-end-line="379" selection-end-column="29" />
+            <state relative-caret-position="124">
+              <caret line="370" column="27" selection-start-line="370" selection-start-column="27" selection-end-line="370" selection-end-column="27" />
               <folding>
                 <element signature="e#2832#2833#0" expanded="true" />
                 <element signature="e#2879#2880#0" expanded="true" />
@@ -304,7 +301,14 @@
       <option name="project" value="LOCAL" />
       <updated>1571516605519</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Added gif of real-time pathfinding">
+      <created>1571523152451</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1571523152451</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -379,7 +383,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types)." />
     <MESSAGE value="Commented out the unfinished implementation of turn-based graph constructor" />
-    <option name="LAST_COMMIT_MESSAGE" value="Commented out the unfinished implementation of turn-based graph constructor" />
+    <MESSAGE value="Added gif of real-time pathfinding" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added gif of real-time pathfinding" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$USER_HOME$/nannou/examples/basics/1_nannou_events.rs">
@@ -608,8 +613,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="259">
-          <caret line="379" column="29" lean-forward="true" selection-start-line="379" selection-start-column="29" selection-end-line="379" selection-end-column="29" />
+        <state relative-caret-position="124">
+          <caret line="370" column="27" selection-start-line="370" selection-start-column="27" selection-end-line="370" selection-end-column="27" />
           <folding>
             <element signature="e#2832#2833#0" expanded="true" />
             <element signature="e#2879#2880#0" expanded="true" />
