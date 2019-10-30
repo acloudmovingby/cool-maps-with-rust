@@ -88,7 +88,6 @@ const MIN_LON: f64 = -71.3095;
 const MAX_LAT: f64 = 41.5251;
 const MIN_LAT: f64 = 41.5162;
 
-
 //Brown University
 /*const MAX_LON: f64 = -71.3909;
 const MIN_LON: f64 = -71.4105;
@@ -101,7 +100,6 @@ const MAX_LON: f64 = -71.39901;
 const MIN_LON: f64 = -71.40392;
 const MAX_LAT: f64 = 41.82546;
 const MIN_LAT: f64 = 41.82323;*/
-
 
 const LON_RANGE: f64 = MAX_LON - MIN_LON;
 const LAT_RANGE: f64 = MAX_LAT - MIN_LAT;
@@ -142,8 +140,15 @@ fn model(app: &App) -> Model {
         .unwrap();
     let t1 = Instant::now();
 
+    //TESTING
+    for i in 1..4 {
+        println!("no. {}", i);
+
+    }
+    // END TESTING
+
     let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-    //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
 
     let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
     let mut pbf = osmpbfreader::OsmPbfReader::new(r);
@@ -246,9 +251,10 @@ fn model(app: &App) -> Model {
 
     // TESTING
     let mut target = pt2(0.0, 0.0);
+    let mut center: NodeIndex<u32> = NodeIndex::<u32>::new(201213347);
     // END TESTING
 
-    // BULD GRAPH
+    // BUILD GRAPH
     // make hashmap of node ids to node indices
     // before adding a node, check to see if it exists
     // when you add an edge, use node index from hashmap
@@ -275,6 +281,10 @@ fn model(app: &App) -> Model {
                 } else {
                     cur_node_index = road_graph.add_node(node.clone());
                     graph_node_indices.insert(node, cur_node_index);
+                    if node_id.0 == 201213347 {
+                        println!("IT WAS TRUE");
+                        center = cur_node_index;
+                    }
                 }
 
                 // if it's not the first one, form an edge
@@ -296,7 +306,6 @@ fn model(app: &App) -> Model {
                     }
 
                     // END TESTING
-
                     road_graph.add_edge(
                         prior_node_index,
                         cur_node_index,
@@ -390,6 +399,20 @@ fn model(app: &App) -> Model {
             });
         }
     }
+
+
+    // TEST CLOCKWISE ORDER FUNCTION
+    let neighbors: Vec<NodeIndex> = road_graph.neighbors(center).collect();
+
+    for neighbor in neighbors.iter() {
+        println!("pre sort: {}", road_graph.node_weight(*neighbor).unwrap().id.0);
+    }
+
+    let neighbors_sorted = get_clockwise_order(neighbors, center, &road_graph);
+    for neighbor in neighbors_sorted {
+        println!("after sort: {}", road_graph.node_weight(neighbor).unwrap().id.0);
+    }
+
     /*
     // MIN DIST FIRST VERSION (WITH BUGGY BELLMAN_FORD ALGORITHM FROM PETGRAPH)
     // shortest path to all nodes in road graph from start node
@@ -594,23 +617,23 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let draw = app.draw();
     let t = app.time;
 
-/*
-        for building in &model.buildings {
-            let mut points: Vec<Point2> = Vec::new();
+    /*
+    for building in &model.buildings {
+        let mut points: Vec<Point2> = Vec::new();
 
-            for node in building {
-                points.push(node.clone());
-            }
+        for node in building {
+            points.push(node.clone());
+        }
 
-            let oscillator = map_range(t.cos(), -1.0, 1.0, 0.0, 1.0);
-            let area = polygon_area(&points).min(150.0);
+        let oscillator = map_range(t.cos(), -1.0, 1.0, 0.0, 1.0);
+        let area = polygon_area(&points).min(150.0);
 
-            let hue = map_range(area, 15.0,150.0, 0.0,0.6);
-            draw.polygon()
-                .points(points)
-                .hsv(hue, 1.0, 0.5)
-            /*.rotate(-t * 0.1)*/;
-        }*/
+        let hue = map_range(area, 15.0,150.0, 0.0,0.6);
+        draw.polygon()
+            .points(points)
+            .hsv(hue, 1.0, 0.5)
+        /*.rotate(-t * 0.1)*/;
+    }*/
 
     // DRAW POLICE STATIONS
     /*
@@ -924,7 +947,7 @@ fn djikstra_float(
     if g.node_weight(start).is_some() {
         let mut min_dist: HashMap<NodeIndex, f32, RandomState>; // final return value; maps node indices to their min distance from the start
         let mut edge_dist: BinaryHeap<DistFloat>; // potential edges to explore; each Dist stores a node and a distance leading up to that node (which may not be the min distance)
-                                                   // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
+                                                  // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
 
         // initialize min_dist
         min_dist = HashMap::new();
@@ -995,23 +1018,52 @@ fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
     }
 }
 
-/*
-Mutates road graph so 4 way intersections don't allow left turns.
-
-fn limit_turns_graph(g: &Graph<Node, f32, Directed>) {
-
-    let g_ret = Graph::<&Node, f32, Directed>::new();
-
-    // key is the original 4 way intersection, the value is the 4 separate directions from the intersection represented as distinct nodes
-    let directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
+//Mutates road graph so 4 way intersections don't allow left turns.
+fn limit_turns_graph(g: &mut Graph<Node, f32, Directed>) {
+    // key is the original 4 way intersection, the value is list of nodes representing 4 separate directions
+    let mut directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
 
     //
     for node_ix in g.node_indices() {
-        g_ret.add_node(&g.node_weight(node_ix));
-    }
+        if g.neighbors(node_ix).count() == 4 {
+            // MAKE 4 NEW NODES that store clone of the original node's weight
+            let mut four_directions = Vec::<NodeIndex>::new();
+            for i in 0..4 {
+                let node_weight = g.node_weight(node_ix).unwrap().clone();
+                let new_node = g.add_node(node_weight);
+                four_directions.push(new_node);
+            }
+            // SET OUTGOING EDGES
+            // get 4 other nodes, arrange in clockwise order
+            let mut neighbors: Vec<NodeIndex> = g.neighbors(node_ix).collect();
+            neighbors = get_clockwise_order(neighbors, node_ix, &g);
 
-    for edge_ix in g.raw_edges() {
-        g_ret.add_edge();
+            // iterating through four_directions, assign one to each direction (doesn't matter which, as long as it's in clockwise order)
+            directional_nodes.insert(node_ix, four_directions);
+            // make an outgoing edge from each of these nodes to each of the original 4 neighbors
+        }
     }
+}
 
-}*/
+/**
+Returns neighbors of graph node in clockwise order by compass directions (which direction starts is whatever's closest to west)
+*/
+fn get_clockwise_order(neighbors: Vec<NodeIndex>, center: NodeIndex, g: &Graph<Node, f32, Directed>) -> Vec<NodeIndex> {
+    let center = g.node_weight(center).unwrap();
+    let mut neighbor_angles: Vec<(f64,NodeIndex)> = neighbors.into_iter()
+        .map(|neighbor_node|{
+            let node = g.node_weight(neighbor_node).unwrap();
+            let dx = node.lon() - center.lon();
+            let dy = node.lat() - center.lat();
+            let angle = dy.atan2(dx);
+            (angle, neighbor_node)
+        })
+        .collect();
+
+    neighbor_angles
+        .sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
+    let sorted_neighbors = neighbor_angles.into_iter()
+        .map(|(_angle,node_ix)| node_ix)
+        .collect();
+    sorted_neighbors
+}
