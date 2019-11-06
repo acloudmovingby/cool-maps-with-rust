@@ -402,6 +402,7 @@ fn model(app: &App) -> Model {
 
 
     // TEST CLOCKWISE ORDER FUNCTION
+    /*
     let neighbors: Vec<NodeIndex> = road_graph.neighbors(center).collect();
 
     for neighbor in neighbors.iter() {
@@ -411,112 +412,9 @@ fn model(app: &App) -> Model {
     let neighbors_sorted = get_clockwise_order(neighbors, center, &road_graph);
     for neighbor in neighbors_sorted {
         println!("after sort: {}", road_graph.node_weight(neighbor).unwrap().id.0);
-    }
+    } */
 
-    /*
-    // MIN DIST FIRST VERSION (WITH BUGGY BELLMAN_FORD ALGORITHM FROM PETGRAPH)
-    // shortest path to all nodes in road graph from start node
-    let min_paths = petgraph::algo::bellman_ford(&road_graph, start);
-    let min_paths = min_paths.unwrap();
 
-    let mut weight_iter = min_paths.0.iter();
-    let mut node_iter = min_paths.1.iter();
-
-    let max_weight = min_paths
-        .0
-        .iter()
-        .filter(|x| x.is_finite())
-        .map(|x| (x * 10000.0) as u32)
-        .max()
-        .unwrap();
-    let num_hue_cycles = 2; // number of times the hue range cycles through before reaching the farthest point.
-    let sat_cycles = 10; // number of times saturation cycles through before reaching the farthest point
-
-    let min_paths: HashMap<Option<NodeIndex>, f32> = min_paths
-        .1
-        .iter()
-        .copied()
-        .zip(min_paths.0.iter().copied())
-        .collect();
-
-    let mut road_lines = Vec::<Line>::new();
-
-    // FOR TESTING
-    let mut in_bounds = 0;
-    let mut partially_in_bounds = 0;
-    let mut not_in_bounds = 0;
-
-    for edge in road_graph.raw_edges() {
-        let mut source_in_bounds = false; // TESTING
-        let mut target_in_bounds = false; // TESTING
-        let source = road_graph.node_weight(edge.source()).map(|node| {
-            if is_in_bounds(&node) {
-                source_in_bounds = true; // FOR TESTING
-            };
-            convert_coord2(node)
-        }); // IMPORTANT
-        let target = road_graph.node_weight(edge.target()).map(|node| {
-            if is_in_bounds(&node) {
-                target_in_bounds = true; // FOR TESTING
-            };
-            convert_coord2(node)
-        }); // IMPORTANT
-
-        // TESTING
-        if source_in_bounds & target_in_bounds {
-            in_bounds += 1;
-        } else if source_in_bounds {
-            partially_in_bounds += 1;
-        } else {
-            not_in_bounds += 1;
-        }
-
-        // IMPORTANT
-        if source.is_some() && target.is_some() {
-            // find weight (which is the f32 path distance from the "start" node to the source node of this edge)
-            let weight_opt = min_paths.get(&Some(edge.source()));
-                                                                  // if there was no weight (i.e. it was not connected to the start node), then make that edge transparent
-            let alpha = 1.0; // if weight_opt.is_none() { 0.0 } else { 1.0 };
-
-            let weight = weight_opt.unwrap_or(&80.0); // the path distance up to
-                                                      //println!("Weight: {}", weight);
-                                                      // MAKES COLORS ROTATE CYCLICALLY
-            let weight = (weight * 10000.0) as u32; // make an integer so you can do % operator
-            let weight_hue = weight % (max_weight / num_hue_cycles);
-            // TRANSFORM WEIGHT INTO HUE (0.0-1.0) / THICKNESS (1.0+) VALUES
-            let hue = map_range(weight_hue, 0, max_weight / num_hue_cycles, HUE_MIN, HUE_MAX);
-
-            // MAKE SATURATION ROTATE CYCLICALLY
-            let weight = weight % (max_weight / sat_cycles); // make saturation cycle faster than hue
-            let saturation = map_range(weight, 0, max_weight / sat_cycles, 0.5, 1.0);
-            //let saturation = 1.0; // if you want no change/cycling of saturation
-
-            // if you want thickness to vary by path distance from start:
-            //let thickness = map_range(weight, 0, max_weight, 3.5, 1.0);
-            let thickness = 1.0;
-
-            road_lines.push(Line {
-                start: source.unwrap(),
-                end: target.unwrap(),
-                thickness,
-                hue,
-                saturation,
-                alpha,
-            });
-        }
-    }
-
-    let mut in_bounds = in_bounds as f32;
-    let mut partially_in_bounds = partially_in_bounds as f32;
-    let mut not_in_bounds = not_in_bounds as f32;
-    let total = in_bounds + partially_in_bounds + not_in_bounds;
-
-    println!(
-        "{}% are in bounds, {}% are partially in bounds and {}% are out of bounds",
-        (in_bounds / total * 100.0) as u32,
-        (partially_in_bounds / total * 100.0) as u32,
-        (not_in_bounds / total * 100.0) as u32
-    );*/
 
     let closest_road_point = pt2(0.0, 0.0);
 
@@ -1020,35 +918,60 @@ fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
 
 //Mutates road graph so 4 way intersections don't allow left turns.
 fn limit_turns_graph(g: &mut Graph<Node, f32, Directed>) {
-    // key is the original 4 way intersection, the value is list of nodes representing 4 separate directions
+    // in this hashmap, the key is the original 4 way intersection, the value is list of nodes representing 4 separate directions
     let mut directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
 
-    //
     for node_ix in g.node_indices() {
         if g.neighbors(node_ix).count() == 4 {
-            // MAKE 4 NEW NODES that store clone of the original node's weight
-            let mut four_directions = Vec::<NodeIndex>::new();
-            for i in 0..4 {
-                let node_weight = g.node_weight(node_ix).unwrap().clone();
-                let new_node = g.add_node(node_weight);
-                four_directions.push(new_node);
-            }
-            // SET OUTGOING EDGES
-            // get 4 other nodes, arrange in clockwise order
+            // MAKE 4 NEW NODES that store clone of the original node's weight, set each one to a different direction
             let mut neighbors: Vec<NodeIndex> = g.neighbors(node_ix).collect();
-            neighbors = get_clockwise_order(neighbors, node_ix, &g);
+            neighbors = get_clockwise_order(&g, node_ix, neighbors);
+            let mut neighbors_iter = neighbors.into_iter();
+            let mut four_copies = Vec::<NodeIndex>::new();
 
-            // iterating through four_directions, assign one to each direction (doesn't matter which, as long as it's in clockwise order)
-            directional_nodes.insert(node_ix, four_directions);
-            // make an outgoing edge from each of these nodes to each of the original 4 neighbors
+            for i in 0..4 {
+                // make copy of node's stored value (its weight)
+                let node_weight = g.node_weight(node_ix).unwrap().clone();
+                // get next neighbor as well as the edge weight to that neighbor
+                let neighbor = neighbors_iter.next().unwrap();
+                let prior_edge = g.find_edge(node_ix, neighbor).unwrap();
+                let edge_weight = *g.edge_weight(prior_edge).unwrap();
+
+                // create new node and set it's outgoing edge to the outgoing edge (this will get changed later so it connects to the write 4-direction node)
+                let new_node = g.add_node(node_weight);
+                g.add_edge(new_node, neighbor, edge_weight);
+                // remove prior edges (in both directions)
+                g.remove_edge(prior_edge);
+                let edge_other_direction = g.find_edge(neighbor, node_ix).unwrap();
+                g.remove_edge(edge_other_direction);
+                //
+                four_copies.push(new_node);
+            }
+
+            // add four directions to the directional nodes hashmap
+            // note that here the list of nodes should be in clockwise order of the directions of their edges
+            directional_nodes.insert(node_ix, four_copies);
+
+
         }
     }
+
+    // after we've set all the outgoing edges (and all 4 way intersections have the 4 clones), we can now align them so they come in to the correct node)
+    for (node, clones) in directional_nodes.iter() {
+        // for each incoming node to the original node, align it with the correct clone node
+        // note that at this point there shouldn't be redundancy because we deleted the original edges after we added the cloned one
+        // for each incoming edge:
+            // find which clone node is the opposite direction
+            // from there, find the ones that go straight and turn right
+            // connect!
+    }
 }
+
 
 /**
 Returns neighbors of graph node in clockwise order by compass directions (which direction starts is whatever's closest to west)
 */
-fn get_clockwise_order(neighbors: Vec<NodeIndex>, center: NodeIndex, g: &Graph<Node, f32, Directed>) -> Vec<NodeIndex> {
+fn get_clockwise_order(g: &Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<NodeIndex>) -> Vec<NodeIndex> {
     let center = g.node_weight(center).unwrap();
     let mut neighbor_angles: Vec<(f64,NodeIndex)> = neighbors.into_iter()
         .map(|neighbor_node|{
@@ -1061,9 +984,78 @@ fn get_clockwise_order(neighbors: Vec<NodeIndex>, center: NodeIndex, g: &Graph<N
         .collect();
 
     neighbor_angles
-        .sort_by(|a,b| a.0.partial_cmp(&b.0).unwrap());
+        .sort_by(|a,b| (-a.0).partial_cmp(&(-b.0)).unwrap());
     let sorted_neighbors = neighbor_angles.into_iter()
         .map(|(_angle,node_ix)| node_ix)
         .collect();
     sorted_neighbors
 }
+
+/**
+Takes pairings of neighbors/internal nodes and returns them sorted such that the neighbors are arranged clockwise around the given center (starting with whichever is in the northwest quadrant closest to west)
+*/
+fn get_clockwise_order2(g: &Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<(NodeIndex,NodeIndex)>) -> Vec<(NodeIndex,NodeIndex)> {
+    let center = g.node_weight(center).unwrap();
+    let mut neighbor_angles: Vec<(f64,(NodeIndex,NodeIndex))> = neighbors.into_iter()
+        .map(|(neighbor_node,internal_node)|{
+            let node = g.node_weight(neighbor_node).unwrap();
+            let dx = node.lon() - center.lon();
+            let dy = node.lat() - center.lat();
+            let angle = dy.atan2(dx);
+            (angle, (neighbor_node,internal_node))
+        })
+        .collect();
+
+    neighbor_angles
+        .sort_by(|a,b| (-a.0).partial_cmp(&(-b.0)).unwrap());
+    let sorted_neighbors = neighbor_angles.into_iter()
+        .map(|(_angle,node_tuple)| node_tuple)
+        .collect();
+    sorted_neighbors
+}
+
+/*
+Used while building a graphs that limit certain kinds of turning (like making right turn only). The vector contains 4 tuples. Each tuple represents (1) a neighbor node from the intersection and (2) the internal node of the intersection that corresponds to going in the direction of that neighbor
+
+/*
+struct FourWayIntersection {
+    neighbors: Vec<(NodeIndex,NodeIndex)>
+}
+
+
+impl FourWayIntersection {
+    /*
+    Lots of arguments here, but by explicitly asking for nodes (and not for a vec), ensures there are precisely 4 directions. (is there a way in rust to ask for a vec of a specific length? Use a tuple?)
+    */
+    pub fn new(g: Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<(NodeIndex, NodeIndex)>) -> FourWayIntersection {
+        let neighbors = get_clockwise_order2(g, center, neighbors);
+        FourWayIntersection{neighbors}
+    }
+
+    /**
+    Given a neighbor of this intersection, it returns the internal node representing going straight. If the argument supplied isn't actually one of the neighbors stored in the FourWayIntersection, this will panic.
+    */
+    pub fn get_straight_across(&self, neighbor: NodeIndex) -> Option<NodeIndex> {
+        let neighbor_ix = self.neighbors.iter().position(|x| x.0.eq(neighbor));
+         let straight_across_ix = (neighbor_ix + 2) % 4;
+            self.neighbors[straight_across_ix].12
+    }
+
+    /**
+    Same as get_straight_across but for left turns.
+    */
+    pub fn get_left_turn(&self, n: NodeIndex) -> Option<NodeIndex> {
+        let index = self.neighbors.iter().position(|x| x.0.eq(neighbor));
+      let left_ix = (index + 1) % 4;
+            self.neighbors[left_ix].1
+    }
+
+    /**
+    Same as get_straight_across but for right turns
+    */
+    pub fn get_right_turn(&self, n: NodeIndex) -> Option<NodeIndex> {
+        let index = self.neighbors.iter().position(|x| x.0.eq(neighbor));
+      let right_ix = (index + 3) % 4;
+            self.neighbors[right_ix].1
+    }
+}*/*/

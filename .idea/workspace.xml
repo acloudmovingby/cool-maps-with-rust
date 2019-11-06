@@ -4,7 +4,8 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="">
+    <list default="true" id="d06b5330-ab51-4815-a420-51bd83e0a001" name="Default Changelist" comment="clockwise sort now working. about to delete prior buggy path distance code (that relied on buggy petgraph bellman-ford algorithm)">
+      <change afterPath="$PROJECT_DIR$/src/bin/min_distance_all_points.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/bin/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/bin/main.rs" afterDir="false" />
     </list>
@@ -19,16 +20,42 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="187">
-              <caret line="413" column="5" lean-forward="true" selection-start-line="413" selection-start-column="5" selection-end-line="413" selection-end-column="5" />
+            <state relative-caret-position="126">
+              <caret line="415" lean-forward="true" selection-start-line="415" selection-end-line="415" />
               <folding>
                 <element signature="e#2847#2848#0" expanded="true" />
                 <element signature="e#2894#2895#0" expanded="true" />
-                <element signature="e#31503#31504#0" expanded="true" />
-                <element signature="e#31539#31540#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/bin/min_distance_all_points.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="221">
+              <caret line="275" column="40" lean-forward="true" selection-start-line="275" selection-start-column="40" selection-end-line="275" selection-end-column="40" />
+              <folding>
+                <element signature="e#2847#2848#0" expanded="true" />
+                <element signature="e#2894#2895#0" expanded="true" />
+                <element signature="e#18263#18264#0" expanded="true" />
+                <element signature="e#18299#18300#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/bin/basic.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="2685">
+              <caret line="181" column="4" selection-start-line="181" selection-start-column="4" selection-end-line="181" selection-end-column="4" />
+              <folding>
+                <element signature="e#2602#2603#0" expanded="true" />
+                <element signature="e#2649#2650#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -37,8 +64,12 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/vec.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-273">
-              <caret line="1448" column="37" selection-start-line="1448" selection-start-column="33" selection-end-line="1448" selection-end-column="37" />
+            <state relative-caret-position="6495">
+              <caret line="434" column="12" selection-start-line="434" selection-start-column="8" selection-end-line="434" selection-end-column="12" />
+              <folding>
+                <element signature="e#15738#15739#0" expanded="true" />
+                <element signature="e#15767#15768#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -46,7 +77,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/slice.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="156">
+            <state relative-caret-position="3150">
               <caret line="213" column="20" selection-start-line="213" selection-start-column="17" selection-end-line="213" selection-end-column="20" />
             </state>
           </provider>
@@ -55,8 +86,17 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.8.0/src/lib.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="240">
-              <caret line="1420" column="7" lean-forward="true" selection-start-line="1420" selection-start-column="7" selection-end-line="1420" selection-end-column="7" />
+            <state relative-caret-position="16500">
+              <caret line="1193" column="49" selection-start-line="1193" selection-start-column="49" selection-end-line="1193" selection-end-column="49" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.8.0/src/adaptors/mod.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="16500">
+              <caret line="1150" column="11" selection-start-line="1150" selection-start-column="11" selection-end-line="1150" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -64,17 +104,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/osmpbfreader-0.13.0/src/objects.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="165">
+            <state relative-caret-position="675">
               <caret line="51" column="11" selection-start-line="51" selection-start-column="11" selection-end-line="51" selection-end-column="11" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/flat_map-0.0.8/src/flat_map.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="210">
-              <caret line="14" column="11" selection-start-line="14" selection-start-column="11" selection-end-line="14" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -82,8 +113,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/graph_impl/mod.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="242">
-              <caret line="88" column="11" selection-start-line="88" selection-start-column="11" selection-end-line="88" selection-end-column="11" />
+            <state relative-caret-position="7155">
+              <caret line="527" column="11" selection-start-line="527" selection-start-column="11" selection-end-line="527" selection-end-column="11" />
               <folding>
                 <element signature="e#23446#23447#0" expanded="true" />
                 <element signature="e#23497#23498#0" expanded="true" />
@@ -95,30 +126,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/iter/traits/iterator.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="172">
+            <state relative-caret-position="1350">
               <caret line="90" column="10" selection-start-line="90" selection-start-column="10" selection-end-line="90" selection-end-column="10" />
-              <folding>
-                <element signature="e#60#61#0" expanded="true" />
-                <element signature="e#84#85#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/nannou-0.9.0/src/app.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="14310">
-              <caret line="976" column="11" selection-start-line="976" selection-start-column="11" selection-end-line="976" selection-end-column="11" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/nannou-0.9.0/src/draw/backend/vulkano.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3525">
-              <caret line="235" column="11" selection-start-line="235" selection-start-column="11" selection-end-line="235" selection-end-column="11" />
             </state>
           </provider>
         </entry>
@@ -134,13 +143,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>f32,</find>
-      <find>direct</find>
-      <find>add_ed</find>
-      <find>min_pat</find>
-      <find>road_gr</find>
-      <find>Direct</find>
-      <find>building_coord</find>
       <find>police_sts</find>
       <find>hue</find>
       <find>buildings</find>
@@ -162,8 +164,15 @@
       <find>point2</find>
       <find>Graph&lt;</find>
       <find>get_clock</find>
-      <find>leng</find>
       <find>center</find>
+      <find>leng</find>
+      <find>self</find>
+      <find>dist</find>
+      <find>test</find>
+      <find>road_graph</find>
+      <find>algo</find>
+      <find>update</find>
+      <find>target</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -181,6 +190,7 @@
         <option value="$PROJECT_DIR$/src/bin/basic_map.rs" />
         <option value="$PROJECT_DIR$/src/bin/basic.rs" />
         <option value="$PROJECT_DIR$/src/bin/main.rs" />
+        <option value="$PROJECT_DIR$/src/bin/min_distance_all_points.rs" />
       </list>
     </option>
   </component>
@@ -207,6 +217,8 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="PackagesPane" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -218,11 +230,6 @@
               <item name="map-project" type="b2602c69:ProjectViewProjectNode" />
               <item name="map-project" type="462c0819:PsiDirectoryNode" />
               <item name="benches" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="map-project" type="b2602c69:ProjectViewProjectNode" />
-              <item name="map-project" type="462c0819:PsiDirectoryNode" />
-              <item name="Screenshots" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="map-project" type="b2602c69:ProjectViewProjectNode" />
@@ -239,8 +246,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="PackagesPane" />
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -338,14 +343,21 @@
       <option name="project" value="LOCAL" />
       <updated>1571523281344</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="clockwise sort now working. about to delete prior buggy path distance code (that relied on buggy petgraph bellman-ford algorithm)">
+      <created>1572403953239</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1572403953240</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="36" y="23" width="1322" height="637" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.2856025" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.28951487" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Image Layers" order="2" />
       <window_info id="Designer" order="3" />
@@ -353,7 +365,7 @@
       <window_info id="Capture Tool" order="5" />
       <window_info id="Favorites" order="6" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" weight="0.3296501" />
+      <window_info active="true" anchor="bottom" id="Find" order="1" visible="true" weight="0.3296501" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.3296501" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
@@ -428,7 +440,8 @@
     <MESSAGE value="Added screenshots folder. Started to work on implementing graph construction for turn-based graphs (4 nodes at each intersection only permitting certain turn types)." />
     <MESSAGE value="Commented out the unfinished implementation of turn-based graph constructor" />
     <MESSAGE value="Added gif of real-time pathfinding" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added gif of real-time pathfinding" />
+    <MESSAGE value="clockwise sort now working. about to delete prior buggy path distance code (that relied on buggy petgraph bellman-ford algorithm)" />
+    <option name="LAST_COMMIT_MESSAGE" value="clockwise sort now working. about to delete prior buggy path distance code (that relied on buggy petgraph bellman-ford algorithm)" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$USER_HOME$/nannou/examples/basics/1_nannou_events.rs">
@@ -588,17 +601,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/bin/basic.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2685">
-          <caret line="181" column="4" selection-start-line="181" selection-start-column="4" selection-end-line="181" selection-end-column="4" />
-          <folding>
-            <element signature="e#2602#2603#0" expanded="true" />
-            <element signature="e#2649#2650#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/num/f32.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="5415">
@@ -641,42 +643,60 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/iter/traits/iterator.rs">
+    <entry file="file://$PROJECT_DIR$/src/bin/basic.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="172">
-          <caret line="90" column="10" selection-start-line="90" selection-start-column="10" selection-end-line="90" selection-end-column="10" />
+        <state relative-caret-position="2685">
+          <caret line="181" column="4" selection-start-line="181" selection-start-column="4" selection-end-line="181" selection-end-column="4" />
           <folding>
-            <element signature="e#60#61#0" expanded="true" />
-            <element signature="e#84#85#0" expanded="true" />
+            <element signature="e#2602#2603#0" expanded="true" />
+            <element signature="e#2649#2650#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/vec.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="6495">
+          <caret line="434" column="12" selection-start-line="434" selection-start-column="8" selection-end-line="434" selection-end-column="12" />
+          <folding>
+            <element signature="e#15738#15739#0" expanded="true" />
+            <element signature="e#15767#15768#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/slice.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="156">
+        <state relative-caret-position="3150">
           <caret line="213" column="20" selection-start-line="213" selection-start-column="17" selection-end-line="213" selection-end-column="20" />
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.8.0/src/lib.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="1420" column="7" lean-forward="true" selection-start-line="1420" selection-start-column="7" selection-end-line="1420" selection-end-column="7" />
+        <state relative-caret-position="16500">
+          <caret line="1193" column="49" selection-start-line="1193" selection-start-column="49" selection-end-line="1193" selection-end-column="49" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/vec.rs">
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.8.0/src/adaptors/mod.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-273">
-          <caret line="1448" column="37" selection-start-line="1448" selection-start-column="33" selection-end-line="1448" selection-end-column="37" />
+        <state relative-caret-position="16500">
+          <caret line="1150" column="11" selection-start-line="1150" selection-start-column="11" selection-end-line="1150" selection-end-column="11" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/osmpbfreader-0.13.0/src/objects.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="675">
+          <caret line="51" column="11" selection-start-line="51" selection-start-column="11" selection-end-line="51" selection-end-column="11" />
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/graph_impl/mod.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="242">
-          <caret line="88" column="11" selection-start-line="88" selection-start-column="11" selection-end-line="88" selection-end-column="11" />
+        <state relative-caret-position="7155">
+          <caret line="527" column="11" selection-start-line="527" selection-start-column="11" selection-end-line="527" selection-end-column="11" />
           <folding>
             <element signature="e#23446#23447#0" expanded="true" />
             <element signature="e#23497#23498#0" expanded="true" />
@@ -684,22 +704,33 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/osmpbfreader-0.13.0/src/objects.rs">
+    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/iter/traits/iterator.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="165">
-          <caret line="51" column="11" selection-start-line="51" selection-start-column="11" selection-end-line="51" selection-end-column="11" />
+        <state relative-caret-position="1350">
+          <caret line="90" column="10" selection-start-line="90" selection-start-column="10" selection-end-line="90" selection-end-column="10" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="187">
-          <caret line="413" column="5" lean-forward="true" selection-start-line="413" selection-start-column="5" selection-end-line="413" selection-end-column="5" />
+        <state relative-caret-position="126">
+          <caret line="415" lean-forward="true" selection-start-line="415" selection-end-line="415" />
           <folding>
             <element signature="e#2847#2848#0" expanded="true" />
             <element signature="e#2894#2895#0" expanded="true" />
-            <element signature="e#31503#31504#0" expanded="true" />
-            <element signature="e#31539#31540#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/bin/min_distance_all_points.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="221">
+          <caret line="275" column="40" lean-forward="true" selection-start-line="275" selection-start-column="40" selection-end-line="275" selection-end-column="40" />
+          <folding>
+            <element signature="e#2847#2848#0" expanded="true" />
+            <element signature="e#2894#2895#0" expanded="true" />
+            <element signature="e#18263#18264#0" expanded="true" />
+            <element signature="e#18299#18300#0" expanded="true" />
           </folding>
         </state>
       </provider>
