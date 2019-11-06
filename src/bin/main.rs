@@ -365,10 +365,10 @@ fn model(app: &App) -> Model {
     for edge in road_graph.raw_edges() {
         let source = road_graph
             .node_weight(edge.source())
-            .map(|node| convert_coord2(node));
+            .map(|node| convert_coord(node));
         let target = road_graph
             .node_weight(edge.target())
-            .map(|node| convert_coord2(node));
+            .map(|node| convert_coord(node));
 
         if source.is_some() && target.is_some() {
             // find weight (which is the f32 path distance from the "start" node to the source node of this edge)
@@ -437,7 +437,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
     let node_closest_to_mouse = model.road_graph.node_indices().min_by_key(|ix| {
         let node = model.road_graph.node_weight(*ix).unwrap();
-        let node_pt = convert_coord2(node);
+        let node_pt = convert_coord(node);
         dist(mouse_pt, node_pt) as u32 // cast because you can't compare floats. these represent pixesl on the screen, so distance should be at least 1.0 and if it's less than that, that's fine
     });
 
@@ -445,7 +445,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         let node_closest_to_mouse = node_closest_to_mouse.unwrap();
 
         model.closest_road_point =
-            convert_coord2(&model.road_graph.node_weight(node_closest_to_mouse).unwrap());
+            convert_coord(&model.road_graph.node_weight(node_closest_to_mouse).unwrap());
 
         let path_as_node_indices = astar(
             &model.road_graph,
@@ -466,7 +466,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
                     (Vec::new(), pt2(0.0, 0.0)),
                     |(mut vec, prior_pt), (i, node_ix)| {
                         let end_pt =
-                            convert_coord2(model.road_graph.node_weight(*node_ix).unwrap());
+                            convert_coord(model.road_graph.node_weight(*node_ix).unwrap());
                         if i != 0 {
                             let line = Line {
                                 start: prior_pt,
@@ -543,17 +543,6 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     // range of hues: 0.55 (cyan) 0.9 (pink)
 
     for road_line in model.road_lines.iter() {
-        // makes the hues move out in ripples
-        let hue_max_int = (HUE_MAX * 1000.0) as u32; // should be a number between 0 and 100 (hues in the hsv are taken as f32s between 0.0 and 1.0)
-        let hue_int = (road_line.hue * 1000.0) as u32;
-        let hue = ((t * 40.0) as u32 + hue_int) % hue_max_int;
-        let hue = map_range(hue, 0, 1000, HUE_MAX, HUE_MIN);
-
-        // saturation done same as hue above, so they move in sync
-        let sat_max = 1000;
-        let sat = (road_line.saturation * 1000.0) as u32;
-        let sat = ((t * 40.0) as u32 + sat) % sat_max;
-        let sat = map_range(sat, 0, 1000, 1.0, 0.5);
 
         draw.line()
             .points(road_line.start, road_line.end)
@@ -574,7 +563,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     /*
         let start = model.road_graph.node_weight(model.start);
         if start.is_some() {
-            let start = convert_coord2(start.unwrap());
+            let start = convert_coord(start.unwrap());
             draw.ellipse()
                 .xy(start)
                 .radius(10.0)
@@ -594,7 +583,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     println!("num nodes: {}",model.road_graph.raw_nodes().len());
     model.road_graph.raw_nodes().iter().map(|node| {
         println!("hey");
-        let pt = convert_coord2(&node.weight);
+        let pt = convert_coord(&node.weight);
         draw.ellipse().x(pt.x).y(pt.y).color(GREEN).radius(0.25);
     });*/
 
@@ -631,13 +620,13 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
             .min_by_key(|&ix| {
                 let node = model.road_graph.node_weight(ix).unwrap();
                 draw
-                let node_pt = convert_coord2(node);
+                let node_pt = convert_coord(node);
                 (dist(mouse_pt, node_pt)*1000.0) as u32
             });
     **/
     /*
     if closest_road_node.is_some() {
-        let pt = convert_coord2(model.road_graph.node_weight(closest_road_node.unwrap()).unwrap());
+        let pt = convert_coord(model.road_graph.node_weight(closest_road_node.unwrap()).unwrap());
         draw.ellipse()
             .x(pt.x)
             .y(pt.y)
@@ -656,53 +645,9 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 
 
 
-    // DRAW PATH (CURRENTLY BETWEEN RANDOM ROAD NODES)
-    let mut prior_node_index = NodeIndex::new(0);
-    for (i, cur_node_index) in model.path.iter().enumerate() {
-        match model.road_graph.node_weight(*cur_node_index) {
-            Some(node) => {
-                // COLORING
-                //let color = BLACK;
-                let weight = model.road_coloring.get(&Some(cur_node_index.clone()));
-                /*let color = weight.map_or(BLACK, |w|
-                    Alpha {
-                    color: Rgb {
-                        red: 1.0,
-                        green: 200.0/255.0,
-                        blue: (w*2.0)/255.0,
-                    },
-                    alpha: 1.0,
-                });*/
-                let weight = weight.unwrap_or(&0.0);
 
-                let weight = map_range(*weight, 0.0, 80.0, 0.5,0.75);
 
-                // DRAWING ROAD
-                // if it's not the first one, draw an edge
-                if is_in_bounds(node) {
-                    if i != 0 {
-                        draw.line()
-                            .points(
-                                convert_coord(
-                                    model.road_graph.node_weight(prior_node_index).unwrap(),
-                                    &win,
-                                ),
-                                convert_coord(node, &win),
-                            )
-                            .x(-win.w() * 0.5)
-                            .y(-win.h() * 0.5)
-                            .thickness(4.0)
-                            .hsva(weight, 1.0,1.0,1.0)
-                            /*.color(color)*/;
-                    }
-                }
-                prior_node_index = *cur_node_index;
-            }
-            None => {}
-        }
-    }*/
-
-    /*
+    
     // DRAWS BOUNDING BOX AT MAX/MIN COORDINATES, DOESN"T WORK YET
     let ne = pt2(WIN_W*0.5, WIN_H*0.5);
     let nw = pt2(-WIN_W*0.5, WIN_H*0.5);
@@ -752,7 +697,7 @@ fn dist(pt1: Point2, pt2: Point2) -> f32 {
     ((pt1.x - pt2.x).powi(2) + (pt1.y - pt2.y).powi(2)).sqrt()
 }
 
-fn convert_coord2(node: &Node) -> Point2 {
+fn convert_coord(node: &Node) -> Point2 {
     let x = map_range(node.lon(), MIN_LON, MAX_LON, -WIN_W * 0.5, WIN_W * 0.5);
     let y = map_range(node.lat(), MIN_LAT, MAX_LAT, -WIN_W * 0.5, WIN_H * 0.5);
     pt2(x, y)
@@ -770,7 +715,7 @@ fn node_ids_to_pts(
                 .into_iter()
                 .map(|x| nodes.get(&x).unwrap())
                 .cloned()
-                .map(|node| convert_coord2(&node))
+                .map(|node| convert_coord(&node))
                 .collect();
             building_paths.push(building_path_as_points);
         }

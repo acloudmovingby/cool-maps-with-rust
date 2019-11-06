@@ -301,7 +301,7 @@ fn dist(pt1: Point2, pt2: Point2) -> f32 {
     ((pt1.x - pt2.x).powi(2) + (pt1.y - pt2.y).powi(2)).sqrt()
 }
 
-fn convert_coord2(node: &Node) -> Point2 {
+fn convert_coord(node: &Node) -> Point2 {
     let x = map_range(node.lon(), MIN_LON, MAX_LON, -WIN_W * 0.5, WIN_W * 0.5);
     let y = map_range(node.lat(), MIN_LAT, MAX_LAT, -WIN_W * 0.5, WIN_H * 0.5);
     pt2(x, y)
@@ -328,10 +328,10 @@ fn color_roads(road_graph: &Graph<Node, f32, Directed>) -> Vec<Line> {
     for edge in road_graph.raw_edges() {
         let source = road_graph
             .node_weight(edge.source())
-            .map(|node| convert_coord2(node));
+            .map(|node| convert_coord(node));
         let target = road_graph
             .node_weight(edge.target())
-            .map(|node| convert_coord2(node));
+            .map(|node| convert_coord(node));
 
         if source.is_some() && target.is_some() {
             // find weight (which is the f32 path distance from the "start" node to the source node of this edge)
