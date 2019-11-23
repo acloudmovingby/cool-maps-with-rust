@@ -1,4 +1,8 @@
 # cool-maps-with-rust
+
+## OVERVIEW
+This project explores different ways of rendering map data taken from OpenStreetMap.org. If you're interested in exploring the code, note that most of the different visualizations are broken up into separate binaries. Note that the "main" binary is simply a place where I experiment so that code is poorly organized.
+
 ## SCREENSHOTS
 ![basic map with buildings/roads](https://github.com/acloudmovingby/cool-maps-with-rust/blob/master/Screenshots/Just%20buildings%20and%20streets%20(Providence%2C%20RI).png)
 Just a basic drawing of the buildings/streets in downtown Providence, RI. Notice that the map data is incomplete and so many buildings are missing :(
