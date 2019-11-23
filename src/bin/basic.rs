@@ -80,7 +80,6 @@ const MIN_LON: f64 = -71.40392;
 const MAX_LAT: f64 = 41.82546;
 const MIN_LAT: f64 = 41.82323;*/
 
-
 const LON_RANGE: f64 = MAX_LON - MIN_LON;
 const LAT_RANGE: f64 = MAX_LAT - MIN_LAT;
 
@@ -97,9 +96,12 @@ fn main() {
 struct Model {
     _window: window::Id,
     buildings: Vec<Vec<Point2>>, // each Vec represents a closed path of points describing the perimeter of the building
-    road_lines: Vec<Line>, // Line stores start, end, hue, saturation, alpha, thickness
+    road_lines: Vec<Line>,       // Line stores start, end, hue, saturation, alpha, thickness
 }
 
+/**
+Sets up the initial state of the program before the nannou UI loop begins.
+*/
 fn model(app: &App) -> Model {
     let _window = app
         .new_window()
@@ -110,7 +112,7 @@ fn model(app: &App) -> Model {
         .unwrap();
 
     let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-    //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
 
     let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
     let mut pbf = osmpbfreader::OsmPbfReader::new(r);
@@ -146,7 +148,6 @@ fn model(app: &App) -> Model {
     // roads thus represents all the Ways that have at least one node in the map bounds
     let mut roads: Vec<Way> = Vec::new();
     for road in all_roads {
-
         let any_in_bounds = road.nodes.iter().any(|node_id| {
             if nodes.contains_key(node_id) {
                 let node = nodes.get(node_id).unwrap();
@@ -161,7 +162,7 @@ fn model(app: &App) -> Model {
             roads.push(road);
         }
     }
-    
+
     // BUILD GRAPH
     // make hashmap of node ids to node indices
     // before adding a node, check to see if it exists
@@ -173,7 +174,6 @@ fn model(app: &App) -> Model {
         for (i, node_id) in road.nodes.iter().enumerate() {
             // look up node using id
             if let Some(node) = nodes.get(node_id) {
-
                 let cur_node_index: NodeIndex;
                 if graph_node_indices.contains_key(node) {
                     cur_node_index = *graph_node_indices.get(node).unwrap();
@@ -210,11 +210,14 @@ fn model(app: &App) -> Model {
 
     Model {
         _window,
-        buildings: buildings,
+        buildings,
         road_lines,
     }
 }
 
+/**
+Just
+*/
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(_key) => {}
@@ -238,22 +241,20 @@ fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     }
 }
 
+/**
+Nannou runs function 60 times per second to produce a new frame.
+*/
 fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let _win = app.window_rect();
     let draw = app.draw();
-
 
     for building in &model.buildings {
         let mut points: Vec<Point2> = Vec::new();
         for node in building {
             points.push(node.clone());
         }
-        draw.polygon()
-            .points(points)
-            .hsv(0.6, 0.7, 0.5);
+        draw.polygon().points(points).hsv(0.6, 0.7, 0.5);
     }
-
-
 
     for road_line in model.road_lines.iter() {
         draw.line()
@@ -323,7 +324,7 @@ Currently not used (commented out above). min_size is the minimum pixel width a 
 This function returns the list of building points with any buildings smaller than the minimum removed.
 */
 fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> {
-    let simplified_points = points
+    points
         .into_iter()
         .filter(|pts| {
             let mut min_y = std::f32::MAX;
@@ -346,10 +347,8 @@ fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> 
             }
             (max_x - min_x > min_size) && (max_y - min_y > min_size)
         })
-        .collect();
-    simplified_points
+        .collect()
 }
-
 
 /**
 In this binary, this function draws the roads as white.

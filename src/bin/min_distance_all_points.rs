@@ -259,6 +259,9 @@ fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     }
 }
 
+/**
+Nannou runs function 60 times per second to produce a new frame.
+*/
 fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let _win = app.window_rect();
     // Prepare to draw.
@@ -409,7 +412,7 @@ fn djikstra_float(
         // initialize min_dist
         min_dist = HashMap::new();
         for node in g.node_indices() {
-            min_dist.insert(node.clone(), std::f32::INFINITY);
+            min_dist.insert(node, std::f32::INFINITY);
         }
         min_dist.insert(start, 0.0);
 

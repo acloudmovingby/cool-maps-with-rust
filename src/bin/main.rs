@@ -5,7 +5,6 @@ use petgraph::algo::astar;
 use petgraph::graph::NodeIndex;
 use petgraph::graph::*;
 use petgraph::prelude::*;
-use petgraph::visit::NodeRef;
 use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
@@ -125,7 +124,6 @@ struct Model {
     path_to_cursor: Vec<Line>,
     road_lines: Vec<Line>, // Line stores start, end, hue, saturation, alpha, thickness
     start: NodeIndex,      // the path goes from the mouse cursor to here
-    target: Point2,
     closest_road_point: Point2,
     police_sts: Vec<Vec<Point2>>,
 }
@@ -249,11 +247,6 @@ fn model(app: &App) -> Model {
     let mut off_map = 0;
     // end testing
 
-    // TESTING
-    let mut target = pt2(0.0, 0.0);
-    let mut center: NodeIndex<u32> = NodeIndex::<u32>::new(201213347);
-    // END TESTING
-
     // BUILD GRAPH
     // make hashmap of node ids to node indices
     // before adding a node, check to see if it exists
@@ -281,7 +274,7 @@ fn model(app: &App) -> Model {
                 } else {
                     cur_node_index = road_graph.add_node(node.clone());
                     graph_node_indices.insert(node, cur_node_index);
-                    if node_id.0 == 201213347 {
+                    if node_id.0 == 201_213_347 {
                         println!("IT WAS TRUE");
                         center = cur_node_index;
                     }
@@ -301,7 +294,7 @@ fn model(app: &App) -> Model {
                     // TESTING
                     let cur_node_id = node.id.0;
                     let other_node_id = prior_node.id.0;
-                    if cur_node_id == 201212502 || other_node_id == 201212502 {
+                    if cur_node_id == 201_212_502 || other_node_id == 201_212_502 {
                         println!("EDGE: {}, {}", cur_node_id, other_node_id);
                     }
 
@@ -426,7 +419,6 @@ fn model(app: &App) -> Model {
         path_to_cursor,
         road_lines,
         start,
-        target,
         closest_road_point,
         police_sts,
     }
@@ -647,7 +639,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 
 
 
-    
+
     // DRAWS BOUNDING BOX AT MAX/MIN COORDINATES, DOESN"T WORK YET
     let ne = pt2(WIN_W*0.5, WIN_H*0.5);
     let nw = pt2(-WIN_W*0.5, WIN_H*0.5);
@@ -658,13 +650,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
         .color(TRANSPARENT);
         */
 
-    // DRAW TARGET NODE
-    /*draw.ellipse()
-        .x(model.target.x)
-        .y(model.target.y)
-        .radius(5.0)
-        .color(YELLOW);*/
-    // Clear the background to pink.
+
 
     
     draw.background().hsv(0.73, 0.55, 0.06);
@@ -724,7 +710,7 @@ fn node_ids_to_pts(
 }
 
 fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> {
-    let simplified_points = points
+    points
         .into_iter()
         .filter(|pts| {
             let mut min_y = std::f32::MAX;
@@ -747,8 +733,7 @@ fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> 
             }
             (max_x - min_x > min_size) && (max_y - min_y > min_size)
         })
-        .collect();
-    simplified_points
+        .collect()
 }
 
 // stores the data I want to use when I draw a line using nannou's draw.line() builder, namely the end points and values for the color/thickness
@@ -795,7 +780,7 @@ fn djikstra_float(
         // initialize min_dist
         min_dist = HashMap::new();
         for node in g.node_indices() {
-            min_dist.insert(node.clone(), std::f32::INFINITY);
+            min_dist.insert(node, std::f32::INFINITY);
         }
         min_dist.insert(start, 0.0);
 
@@ -846,8 +831,8 @@ fn djikstra_float(
     }
 }
 
-fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
-    if points.len() == 0 {
+fn polygon_area(points: &[Point2<f32>]) -> f32 {
+    if points.is_empty() {
         0.0
     } else {
         let mut area = 0.0;
@@ -861,146 +846,3 @@ fn polygon_area(points: &Vec<Point2<f32>>) -> f32 {
     }
 }
 
-//Mutates road graph so 4 way intersections don't allow left turns.
-fn limit_turns_graph(g: &mut Graph<Node, f32, Directed>) {
-    // in this hashmap, the key is the original 4 way intersection, the value is list of nodes representing 4 separate directions
-    let mut directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
-
-    for node_ix in g.node_indices() {
-        if g.neighbors(node_ix).count() == 4 {
-            // MAKE 4 NEW NODES that store clone of the original node's weight, set each one to a different direction
-            let mut neighbors: Vec<NodeIndex> = g.neighbors(node_ix).collect();
-            neighbors = get_clockwise_order(&g, node_ix, neighbors);
-            let mut neighbors_iter = neighbors.into_iter();
-            let mut four_copies = Vec::<NodeIndex>::new();
-
-            for i in 0..4 {
-                // make copy of node's stored value (its weight)
-                let node_weight = g.node_weight(node_ix).unwrap().clone();
-                // get next neighbor as well as the edge weight to that neighbor
-                let neighbor = neighbors_iter.next().unwrap();
-                let prior_edge = g.find_edge(node_ix, neighbor).unwrap();
-                let edge_weight = *g.edge_weight(prior_edge).unwrap();
-
-                // create new node and set it's outgoing edge to the outgoing edge (this will get changed later so it connects to the write 4-direction node)
-                let new_node = g.add_node(node_weight);
-                g.add_edge(new_node, neighbor, edge_weight);
-                // remove prior edges (in both directions)
-                g.remove_edge(prior_edge);
-                let edge_other_direction = g.find_edge(neighbor, node_ix).unwrap();
-                g.remove_edge(edge_other_direction);
-                //
-                four_copies.push(new_node);
-            }
-
-            // add four directions to the directional nodes hashmap
-            // note that here the list of nodes should be in clockwise order of the directions of their edges
-            directional_nodes.insert(node_ix, four_copies);
-
-
-        }
-    }
-
-    // after we've set all the outgoing edges (and all 4 way intersections have the 4 clones), we can now align them so they come in to the correct node)
-    for (node, clones) in directional_nodes.iter() {
-        // for each incoming node to the original node, align it with the correct clone node
-        // note that at this point there shouldn't be redundancy because we deleted the original edges after we added the cloned one
-        // for each incoming edge:
-            // find which clone node is the opposite direction
-            // from there, find the ones that go straight and turn right
-            // connect!
-    }
-}
-
-
-/**
-Returns neighbors of graph node in clockwise order by compass directions (which direction starts is whatever's closest to west)
-*/
-fn get_clockwise_order(g: &Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<NodeIndex>) -> Vec<NodeIndex> {
-    let center = g.node_weight(center).unwrap();
-    let mut neighbor_angles: Vec<(f64,NodeIndex)> = neighbors.into_iter()
-        .map(|neighbor_node|{
-            let node = g.node_weight(neighbor_node).unwrap();
-            let dx = node.lon() - center.lon();
-            let dy = node.lat() - center.lat();
-            let angle = dy.atan2(dx);
-            (angle, neighbor_node)
-        })
-        .collect();
-
-    neighbor_angles
-        .sort_by(|a,b| (-a.0).partial_cmp(&(-b.0)).unwrap());
-    let sorted_neighbors = neighbor_angles.into_iter()
-        .map(|(_angle,node_ix)| node_ix)
-        .collect();
-    sorted_neighbors
-}
-
-/**
-Takes pairings of neighbors/internal nodes and returns them sorted such that the neighbors are arranged clockwise around the given center (starting with whichever is in the northwest quadrant closest to west)
-*/
-fn get_clockwise_order2(g: &Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<(NodeIndex,NodeIndex)>) -> Vec<(NodeIndex,NodeIndex)> {
-    let center = g.node_weight(center).unwrap();
-    let mut neighbor_angles: Vec<(f64,(NodeIndex,NodeIndex))> = neighbors.into_iter()
-        .map(|(neighbor_node,internal_node)|{
-            let node = g.node_weight(neighbor_node).unwrap();
-            let dx = node.lon() - center.lon();
-            let dy = node.lat() - center.lat();
-            let angle = dy.atan2(dx);
-            (angle, (neighbor_node,internal_node))
-        })
-        .collect();
-
-    neighbor_angles
-        .sort_by(|a,b| (-a.0).partial_cmp(&(-b.0)).unwrap());
-    let sorted_neighbors = neighbor_angles.into_iter()
-        .map(|(_angle,node_tuple)| node_tuple)
-        .collect();
-    sorted_neighbors
-}
-
-/*
-Used while building a graphs that limit certain kinds of turning (like making right turn only). The vector contains 4 tuples. Each tuple represents (1) a neighbor node from the intersection and (2) the internal node of the intersection that corresponds to going in the direction of that neighbor
-
-/*
-struct FourWayIntersection {
-    neighbors: Vec<(NodeIndex,NodeIndex)>
-}
-
-
-impl FourWayIntersection {
-    /*
-    Lots of arguments here, but by explicitly asking for nodes (and not for a vec), ensures there are precisely 4 directions. (is there a way in rust to ask for a vec of a specific length? Use a tuple?)
-    */
-    pub fn new(g: Graph<Node, f32, Directed>, center: NodeIndex, neighbors: Vec<(NodeIndex, NodeIndex)>) -> FourWayIntersection {
-        let neighbors = get_clockwise_order2(g, center, neighbors);
-        FourWayIntersection{neighbors}
-    }
-
-    /**
-    Given a neighbor of this intersection, it returns the internal node representing going straight. If the argument supplied isn't actually one of the neighbors stored in the FourWayIntersection, this will panic.
-    */
-    pub fn get_straight_across(&self, neighbor: NodeIndex) -> Option<NodeIndex> {
-        let neighbor_ix = self.neighbors.iter().position(|x| x.0.eq(neighbor));
-         let straight_across_ix = (neighbor_ix + 2) % 4;
-            self.neighbors[straight_across_ix].12
-    }
-
-    /**
-    Same as get_straight_across but for left turns.
-    */
-    pub fn get_left_turn(&self, n: NodeIndex) -> Option<NodeIndex> {
-        let index = self.neighbors.iter().position(|x| x.0.eq(neighbor));
-      let left_ix = (index + 1) % 4;
-            self.neighbors[left_ix].1
-    }
-
-    /**
-    Same as get_straight_across but for right turns
-    */
-    pub fn get_right_turn(&self, n: NodeIndex) -> Option<NodeIndex> {
-        let index = self.neighbors.iter().position(|x| x.0.eq(neighbor));
-      let right_ix = (index + 3) % 4;
-            self.neighbors[right_ix].1
-    }
-}*/*/
