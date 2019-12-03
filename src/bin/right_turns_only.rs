@@ -306,8 +306,21 @@ fn model(app: &App) -> Model {
     }
 
     let no_left_turns_graph = prohibit_left_turns(&road_graph);
-    // create turn limited graph struct
     let road_lines: Vec<Line> = color_roads(&road_graph, test_node);
+
+    // find the minimum distance to every node in the graphs (in both the original and the turn-modified graph)
+    let orig_min_dist_to_nodes = djikstra_float(&road_graph, test_node);
+    let modified_min_dist_to_nodes = djikstra_float(&no_left_turns_graph, test_node);
+
+    // now make graphs where the edges themselves represent the min distances. (it takes the min distance to each endpoint and averages them--graph with clones it takes whichever clone pair has the smallest average)
+    let orig_min_dist = min_dist_as_edges(&road_graph, &orig_min_dist_to_nodes);
+    let modified_min_dist = min_dist_as_edges(&no_left_turns_graph, &modified_min_dist_to_nodes);
+
+    // subtract difference between original and modified graphs
+    let difference_graph = edge_difference(&orig_min_dist, &modified_min_dist);
+
+    // convert into Lines for easy nannou drawing
+    let road_lines = make_lines_for_nannou(&difference_graph);
 
     Model {
         _window,
@@ -339,7 +352,7 @@ fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
 }
 
 /**
-Nannou runs function 60 times per second to produce a new frame.
+Nannou runs this many times per second to create each frame.
 */
 fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let _win = app.window_rect();
@@ -389,7 +402,106 @@ fn convert_coord(node: &Node) -> Point2 {
     pt2(x, y)
 }
 
+/**
+Djikstra's algorithm finds the min distance to nodes, however when we draw the roads using nannou, we draw the lines in between nodes, not the nodes themselves. This function averages the min distance of each endpoint nodes and makes that average the weight of the edge.
+
+The modified graph, where there are multiple clones for each location, presents some issues. Because more than one node represents a single individual location, for the weight of the final edge in the return graph, it chooses whichever edge pairing has the minimum distance. Because these various clones represent different possible ways of reaching that node, any of them is a valid point to reach, and so the return graph will accurately show the MINIMUM distance to that road segment.
+
+*/
+fn min_dist_as_edges(g: &Graph<Node, f32, Directed>, min_dist: &HashMap<NodeIndex, Option<f32>, RandomState>) -> Graph<Node, f32, Undirected> {
+
+    Graph::<Node, f32, Undirected>::new_undirected()
+}
+
+/**
+This takes two IDENTICALLY STRUCTURED graphs and returns another identically structured graph with the difference between their edge weights (for each edge, the g1 weight minus the g2 weight).
+
+This can show the difference between two pathfinding algorithms for the same road graph (e.g. where one limited certain kinds of turns). The two graphs MUST be identical, except for their edge weights. More specifically, the number of nodes and edges must be the same, the way those edges/nodes are connected must be the same, and the weights of all nodes must be the same. If this isn't true, this function will probably panic or do something weird.
+*/
+fn edge_difference(g1: &Graph<Node, f32, Undirected>, g2: &Graph<Node, f32, Undirected>) -> Graph<Node, f32, Undirected> {
+
+    // build a hashmap associating the OpenStreetMap node id with node indices from the petgraph graph (the OSM id is the actual values stored in the petgraph graph nodes)
+    let g1_nodes: HashMap<i64, NodeIndex> = g1.node_indices()
+        .map(|node_ix| {
+            let osm_node_id = g1.node_weight(node_ix).unwrap().id.0;
+            (osm_node_id,node_ix) // note here the node_ix refers to the index of the node in the petgraph Graph, while the osm_node_id refers to the OpenStreetMap node id
+        })
+        .collect();
+
+    // using the fact that in both graphs equivalent nodes will share the same value (OSM id), we can now build a hashmap associating nodes in g1 with their equivalent nodes in g2 by finding which graph nodes contain the same OSM node id
+    let g1_to_g2: HashMap<NodeIndex, NodeIndex> = g2.node_indices()
+        .map(|g2_node_ix| {
+            let osm_node_id = g2.node_weight(g2_node_ix).unwrap().id.0;
+            let g1_node_ix = *g1_nodes.get(&osm_node_id).unwrap();
+            (g1_node_ix, g2_node_ix)
+        })
+        .collect();
+
+    // now we build our new graph's nodes, making the clones of the ids in g1
+    // we also at the same time build a hashmap associating the g1 nodes with these new graph nodes
+    let mut ret_graph = Graph::<Node, f32, Undirected>::new_undirected();
+    let mut g1_to_ret = HashMap::new();
+    for g1_node_ix in g1.node_indices() {
+        let new_node_ix = ret_graph.add_node(g1.node_weight(g1_node_ix).unwrap().clone());
+        g1_to_ret.insert(g1_node_ix, new_node_ix);
+    }
+
+    // now we use the various hashmaps we previously created associating nodes between the three different graphs to help us rebuild the edges
+    for edge_ix in g1.edge_indices() {
+        // get g1 endpoints
+        let (g1_start, g1_end) = g1.edge_endpoints(edge_ix).unwrap();
+        // get g2 equivalents
+        let g2_start = *g1_to_g2.get(&g1_start).unwrap();
+        let g2_end = *g1_to_g2.get(&g1_end).unwrap();
+        // get ret_graph equivalents
+        let ret_start = *g1_to_ret.get(&g1_start).unwrap();
+        let ret_end = *g1_to_ret.get(&g1_end).unwrap();
+        //get g1 edge weight
+        let g1_weight = *g1.edge_weight(edge_ix).unwrap();
+        // get g2 edge weight
+        let g2_weight = *g2.edge_weight(g2.find_edge(g2_start,g2_end).unwrap()).unwrap();
+        // make new edge with weight being difference between two edges
+        ret_graph.add_edge(ret_start, ret_end, g1_weight - g2_weight);
+    }
+
+    ret_graph
+}
+
+fn make_lines_for_nannou(g: &Graph<Node, f32, Undirected>) -> Vec<Line> {
+    Vec::new()
+}
+
 fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) -> Vec<Line> {
+    // so we have a hash of nodes to distance values (f32)
+    // however at the intersections we have 4 values and multiple edges representing one path
+    // so for each original bidirectional edge in the graph we need to find the one with the minimum avg weight
+    // then make a Line that represents
+
+    // OPTION 1:
+    // first, when we build the left-turn graph, we can group the clones together in a HashSet by group
+    // then, in color_roads we pass both the graph but also the hashset of clone groups
+    // Problem: we do delete nodes at end of prohibit_left_turns which messes up node indices
+    // can fix problem by using StableGraph, which shouldn't change anything (hopefully!)
+
+    // OPTION 2:
+    // somehow make that hashset group in the color_roads
+    // I could cycle through every node, get its value, then make a hashmap with the key being the actual Node (the node weight)
+    // the values of the hashmap would be a list of node indices (which you would append to)
+
+    let nodes_grouped: HashMap<Node, Vec<NodeIndex>, RandomState> = group_by_orig_location(road_graph);
+    // "location" refers to a node id from the original map data (a unique "location" on the map)
+    // however because of the way we constucted the turn-limited graph, multiple nodes may exist for a single location
+    for (location, graph_nodes) in nodes_grouped {
+        // make a Line for all of its edges going out
+        // mark that this location has been accounted for
+        if graph_nodes.len() == 1 {
+            
+        } else {
+
+        }
+    }
+
+
     let node_indices: Vec<NodeIndex> = road_graph.node_indices().collect();
     let num_nodes = node_indices.len();
     let mut rng = rand::thread_rng();
@@ -449,7 +561,11 @@ fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) ->
     road_lines
 }
 
-// stores the data I want to use when I draw a line using nannou's draw.line() builder, namely the end points and values for the color/thickness
+fn group_by_orig_location(g: &Graph<Node, f32, Directed>) -> HashMap<Node, Vec<NodeIndex>, RandomState> {
+    HashMap::new()
+}
+
+// compactly stores the data to use for the nannou's draw.line() builder, so no need to recompute things when rendering
 struct Line {
     start: Point2<f32>,
     end: Point2<f32>,
@@ -684,7 +800,7 @@ fn create_clones(
 }
 
 /**
-Once you have the clones, then you align them so each one points to a different neighbor node (remember, these "clones" represent the 4 different directions you could go to from the intersection)
+Once you have the clones, then you align them so each one points to a different neighbor node (remember, these "clones" represent the 4 different directions leaving the intersection)
 */
 fn add_outgoing_edges(
     g: &mut Graph<Node, f32, Directed>,
