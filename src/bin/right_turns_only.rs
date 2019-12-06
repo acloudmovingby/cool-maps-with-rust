@@ -10,6 +10,7 @@ use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use petgraph::visit::IntoEdges;
 
 // AROUND MY HOUSE
 /*
@@ -185,7 +186,41 @@ fn main() {
 
     }*/
 
-    nannou::app(model).run();
+    let node0: Node = Node{ id: NodeId(0), tags: Default::default(), decimicro_lat: 0, decimicro_lon: 0};
+    let node1: Node = Node{ id: NodeId(1), tags: Default::default(), decimicro_lat: 0, decimicro_lon: 0};
+    let mut test_graph = Graph::<Node, f32, Directed>::new();
+
+    let mut min_dist = HashMap::new();
+
+    let n0 = test_graph.add_node(node0);
+    let n1 = test_graph.add_node(node1);
+    test_graph.add_edge(n0, n1, 10.0);
+    min_dist.insert(n0, Some(0.0));
+    min_dist.insert(n1, Some(10.0));
+
+    let result = min_dist_as_edges(&test_graph, &min_dist);
+
+    assert_eq!(result.node_count(),2);
+    assert_eq!(result.edge_count(),1);
+    assert_eq!(*result.edge_weight(result.edge_indices().next().unwrap()).unwrap(),5.0);
+    /*
+    TEST:
+    - empty graph (CHECK)
+    - one node (CHECK)
+    - two nodes, one edge (CHECK)
+    - two nodes, one unreachable
+    - two nodes, both unreachable --> doesn't make sense really
+    - two nodes, two edges each way different weights (weights shdnt matter)
+    - two nodes, 3+ edges each way different weights (weights shdnt matter)
+
+    - two nodes (two clones each), 4 edges not evenly distributed
+    */
+
+
+
+
+
+    //nannou::app(model).run();
 }
 
 struct Model {
@@ -403,14 +438,63 @@ fn convert_coord(node: &Node) -> Point2 {
 }
 
 /**
-Djikstra's algorithm finds the min distance to nodes, however when we draw the roads using nannou, we draw the lines in between nodes, not the nodes themselves. This function averages the min distance of each endpoint nodes and makes that average the weight of the edge.
+Djikstra's algorithm finds the min distance to nodes, however when we draw the roads using nannou, we draw the lines in between nodes, not the nodes themselves. This function averages the min distance to each endpoint nodes and makes that average the weight of the edge. Because when we draw the final graph, we don't care about directionality anymore, and simply what is the distance to a given edge, so the return graph is undirected.
 
-The modified graph, where there are multiple clones for each location, presents some issues. Because more than one node represents a single individual location, for the weight of the final edge in the return graph, it chooses whichever edge pairing has the minimum distance. Because these various clones represent different possible ways of reaching that node, any of them is a valid point to reach, and so the return graph will accurately show the MINIMUM distance to that road segment.
+Note that the turn-limited graph has multiple "clone" nodes for each location. Because more than one node represents a single individual location, for the weight of the final edge in the return graph, this function chooses whichever edge has endpoints with the miniumum min-distance. Because these various clones represent different possible ways of reaching their location, any of them is a valid point to reach, and so the return graph from this function should accurately show the MINIMUM distance to that road segment.
 
 */
 fn min_dist_as_edges(g: &Graph<Node, f32, Directed>, min_dist: &HashMap<NodeIndex, Option<f32>, RandomState>) -> Graph<Node, f32, Undirected> {
+    let mut ret_graph = Graph::<Node, f32, Undirected>::new_undirected();
+    // group the nodes by their geographical location (at intersections multiple clones correspond to only one point in the map)
+    let unique_locations = group_by_orig_location(g);
+    let mut g_to_ret_graph: HashMap<NodeIndex,NodeIndex> = HashMap::new();
+    for (location, clones) in unique_locations {
+        let new_node_ix = ret_graph.add_node(location.clone());
+        for clone in clones {
+            g_to_ret_graph.insert(clone,new_node_ix);
+        }
+    }
 
-    Graph::<Node, f32, Undirected>::new_undirected()
+    for edge in g.edge_indices() {
+        // get the endpoints in g, then find their equivalents in ret_graph
+        let (start_g,end_g) = g.edge_endpoints(edge).unwrap();
+        let start_ret = *g_to_ret_graph.get(&start_g).unwrap();
+        let end_ret = *g_to_ret_graph.get(&end_g).unwrap();
+        // check to see if an edge already exists. If not, make a new one with maximum f32 value
+        let ret_graph_edge = ret_graph.find_edge(start_ret,end_ret)
+            .unwrap_or(
+                ret_graph.add_edge(start_ret, end_ret, std::f32::MAX)
+            );
+
+        // compare the edge weight in g with the edge weight in ret_graph, then use the new edge weight if it's lower.
+        let min_dist_to_start = min_dist.get(&start_g).unwrap(); // minimum distance to start node
+        let min_dist_to_end = min_dist.get(&end_g).unwrap();
+        // if the graph is disconnected, then some nodes might have None value, meaning they're unreachable (so ignore them)
+        if (min_dist_to_start.is_some() || min_dist_to_end.is_some()) {
+            let mut weight = (min_dist_to_start.unwrap() + min_dist_to_end.unwrap()) / 2.0;
+            let mut cur_weight: &mut f32 = ret_graph.edge_weight_mut(ret_graph_edge).unwrap();
+            *cur_weight = if OrderedFloat(*cur_weight).cmp(&OrderedFloat(weight)).eq(&Ordering::Less) { *cur_weight }  else { weight };
+        }
+
+
+    }
+    ret_graph
+}
+
+/**
+Groups the nodes in the graph by the value they contain. It creates a hashmap from that value (i.e. the "node weight") to the nodes that contain that value.
+
+This has the effect, of in our example where each node contains an OSM node id representing a geographical coordinate, groups nodes by the geographical location they represent (since in our left turn limited graph, there are clones representing the same intersection).
+*/
+fn group_by_orig_location(g: &Graph<Node, f32, Directed>) -> HashMap<&Node, Vec<NodeIndex>, RandomState> {
+    let mut unique_locations: HashMap<&Node, Vec<NodeIndex>, RandomState> = HashMap::new();
+    for node_ix in g.node_indices() {
+        let osm_node = g.node_weight(node_ix).unwrap();
+        let node_list = unique_locations.entry(osm_node).or_insert(Vec::new());
+        node_list.push(node_ix);
+
+    }
+    unique_locations
 }
 
 /**
@@ -463,7 +547,6 @@ fn edge_difference(g1: &Graph<Node, f32, Undirected>, g2: &Graph<Node, f32, Undi
         // make new edge with weight being difference between two edges
         ret_graph.add_edge(ret_start, ret_end, g1_weight - g2_weight);
     }
-
     ret_graph
 }
 
@@ -472,34 +555,6 @@ fn make_lines_for_nannou(g: &Graph<Node, f32, Undirected>) -> Vec<Line> {
 }
 
 fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) -> Vec<Line> {
-    // so we have a hash of nodes to distance values (f32)
-    // however at the intersections we have 4 values and multiple edges representing one path
-    // so for each original bidirectional edge in the graph we need to find the one with the minimum avg weight
-    // then make a Line that represents
-
-    // OPTION 1:
-    // first, when we build the left-turn graph, we can group the clones together in a HashSet by group
-    // then, in color_roads we pass both the graph but also the hashset of clone groups
-    // Problem: we do delete nodes at end of prohibit_left_turns which messes up node indices
-    // can fix problem by using StableGraph, which shouldn't change anything (hopefully!)
-
-    // OPTION 2:
-    // somehow make that hashset group in the color_roads
-    // I could cycle through every node, get its value, then make a hashmap with the key being the actual Node (the node weight)
-    // the values of the hashmap would be a list of node indices (which you would append to)
-
-    let nodes_grouped: HashMap<Node, Vec<NodeIndex>, RandomState> = group_by_orig_location(road_graph);
-    // "location" refers to a node id from the original map data (a unique "location" on the map)
-    // however because of the way we constucted the turn-limited graph, multiple nodes may exist for a single location
-    for (location, graph_nodes) in nodes_grouped {
-        // make a Line for all of its edges going out
-        // mark that this location has been accounted for
-        if graph_nodes.len() == 1 {
-            
-        } else {
-
-        }
-    }
 
 
     let node_indices: Vec<NodeIndex> = road_graph.node_indices().collect();
@@ -561,9 +616,7 @@ fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) ->
     road_lines
 }
 
-fn group_by_orig_location(g: &Graph<Node, f32, Directed>) -> HashMap<Node, Vec<NodeIndex>, RandomState> {
-    HashMap::new()
-}
+
 
 // compactly stores the data to use for the nannou's draw.line() builder, so no need to recompute things when rendering
 struct Line {
@@ -974,4 +1027,18 @@ struct TurnLimitedGraph {
     original_graph: Graph<Node, f32, Directed>,
     graph_with_clones: Graph<Node, f32, Directed>,
     original_to_clones: Graph<Node, f32, Directed> // for a given intersection, allows you to look up the clones so you can choose the one with the minimum distance value
+}
+
+
+/**
+TODO: put in separate file
+*/
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_no_nodes() {
+
+    }
+
 }
