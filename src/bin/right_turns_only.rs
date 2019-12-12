@@ -11,7 +11,6 @@ use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
-use std::collections::HashSet;
 
 // AROUND MY HOUSE
 /*
@@ -311,9 +310,9 @@ fn model(app: &App) -> Model {
     let n5 = road_graph.add_node(node5);
     let n6 = road_graph.add_node(node6);
     let n7 = road_graph.add_node(node7);
-   // let n8 = road_graph.add_node(node8);
-   // let n9 = road_graph.add_node(node9);
-   // let n10 = road_graph.add_node(node10);
+    // let n8 = road_graph.add_node(node8);
+    // let n9 = road_graph.add_node(node9);
+    // let n10 = road_graph.add_node(node10);
     road_graph.add_edge(n0, n1, 1.0); // the edge weights don't actually matter here as we're only testing the structure of the graph
     road_graph.add_edge(n1, n0, 1.0);
     road_graph.add_edge(n0, n2, 1.0);
@@ -328,17 +327,23 @@ fn model(app: &App) -> Model {
     road_graph.add_edge(n6, n3, 1.0);
     road_graph.add_edge(n3, n7, 1.0);
     road_graph.add_edge(n7, n3, 1.0);
-  /* road_graph.add_edge(n7, n8, 1.0);
+    /* road_graph.add_edge(n7, n8, 1.0);
     road_graph.add_edge(n8, n7, 1.0);
     road_graph.add_edge(n7, n9, 1.0);
     road_graph.add_edge(n9, n7, 1.0);
     road_graph.add_edge(n7, n10, 1.0);
     road_graph.add_edge(n10, n7, 1.0);*/
     for edge in road_graph.edge_indices() {
-        let (start,end) = road_graph.edge_endpoints(edge).unwrap();
+        let (start, end) = road_graph.edge_endpoints(edge).unwrap();
         let start_weight = road_graph.node_weight(start).unwrap();
         let end_weight = road_graph.node_weight(end).unwrap();
-        println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
+        println!(
+            "({},{} -> {},{})",
+            start_weight.id.0,
+            start.index(),
+            end_weight.id.0,
+            end.index()
+        );
         // println!("({},{})",start_weight.id.0, end_weight.id.0);
     }
 
@@ -346,10 +351,16 @@ fn model(app: &App) -> Model {
 
     println!("CHECKING GRAPH START");
     for edge in no_left_turns_graph.edge_indices() {
-        let (start,end) = no_left_turns_graph.edge_endpoints(edge).unwrap();
+        let (start, end) = no_left_turns_graph.edge_endpoints(edge).unwrap();
         let start_weight = no_left_turns_graph.node_weight(start).unwrap();
         let end_weight = no_left_turns_graph.node_weight(end).unwrap();
-        println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
+        println!(
+            "({},{} -> {},{})",
+            start_weight.id.0,
+            start.index(),
+            end_weight.id.0,
+            end.index()
+        );
         // println!("({},{})",start_weight.id.0, end_weight.id.0);
     }
     println!("CHECKING GRAPH END");
@@ -701,7 +712,7 @@ fn djikstra_float(
     if g.node_weight(start).is_some() {
         let mut min_dist: HashMap<NodeIndex, f32, RandomState>; // final return value; maps node indices to their min distance from the start
         let mut edge_dist: BinaryHeap<DistFloat> = BinaryHeap::new(); // potential edges to explore; each Dist stores a node and a distance leading up to that node (which may not be the min distance)
-                                                  // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
+                                                                      // Djikstra's formula works by always selecting the minimum of those potential edges (hence why it's a BinaryHeap (Priority Queue)
 
         // initialize min_dist
         min_dist = HashMap::new();
@@ -712,7 +723,8 @@ fn djikstra_float(
         min_dist.insert(start, 0.0);
         // if it's a modified graph, multiple clones represent one location (osm_id), so all the nodes for the starting location need to have minimum distance of zero.
 
-        let start_indices: Vec<NodeIndex> = g.node_indices()
+        let start_indices: Vec<NodeIndex> = g
+            .node_indices()
             .filter(|&node_ix| *g.node_weight(start).unwrap() == *g.node_weight(node_ix).unwrap())
             .collect();
 
@@ -720,23 +732,23 @@ fn djikstra_float(
             min_dist.insert(start_ix, 0.0);
             let edges_from_start = g.edges_directed(start_ix, Outgoing);
             edges_from_start
-                .map(|edge| DistFloat{
+                .map(|edge| DistFloat {
                     node: edge.target(),
-                    dist: OrderedFloat(*edge.weight())
+                    dist: OrderedFloat(*edge.weight()),
                 })
                 .for_each(|edge| edge_dist.push(edge));
         }
 
         /*
-        println!("transformed graph ****");
-        for edge in g.edge_indices() {
-            let (start,end) = g.edge_endpoints(edge).unwrap();
-            let start_weight = g.node_weight(start).unwrap();
-            let end_weight = g.node_weight(end).unwrap();
-                println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
-               // println!("({},{})",start_weight.id.0, end_weight.id.0);
-            }
-*/
+                println!("transformed graph ****");
+                for edge in g.edge_indices() {
+                    let (start,end) = g.edge_endpoints(edge).unwrap();
+                    let start_weight = g.node_weight(start).unwrap();
+                    let end_weight = g.node_weight(end).unwrap();
+                        println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
+                       // println!("({},{})",start_weight.id.0, end_weight.id.0);
+                    }
+        */
         // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from start
         let edges_from_start = g.edges_directed(start, Outgoing);
         edge_dist = edges_from_start
@@ -784,82 +796,6 @@ fn djikstra_float(
     }
 }
 
-//Mutates road graph so 4 way intersections don't allow left turns.
-fn right_turns_only(g: &mut Graph<Node, f32, Directed>) {
-    // in this hashmap, the key is the original 4 way intersection, the value is list of nodes representing 4 separate directions
-    let mut directional_nodes: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
-
-    for node_ix in g.node_indices() {
-        if g.neighbors(node_ix).count() == 4 {
-            // MAKE 4 NEW NODES that store clone of the original node's weight, set each one to a different direction
-            let mut neighbors: Vec<NodeIndex> = g.neighbors(node_ix).collect();
-            neighbors = get_clockwise_order(&g, node_ix, neighbors);
-            let mut neighbors_iter = neighbors.into_iter();
-            let mut four_copies = Vec::<NodeIndex>::new();
-
-            for i in 0..4 {
-                // make copy of node's stored value (its weight)
-                let node_weight = g.node_weight(node_ix).unwrap().clone();
-                // get next neighbor as well as the edge weight to that neighbor
-                let neighbor = neighbors_iter.next().unwrap();
-                let prior_edge = g.find_edge(node_ix, neighbor).unwrap();
-                let edge_weight = *g.edge_weight(prior_edge).unwrap();
-
-                // create new node and set it's outgoing edge to the outgoing edge (this will get changed later so it connects to the write 4-direction node)
-                let new_node = g.add_node(node_weight);
-                g.add_edge(new_node, neighbor, edge_weight);
-                // remove prior edges (in both directions)
-                g.remove_edge(prior_edge);
-                let edge_other_direction = g.find_edge(neighbor, node_ix).unwrap();
-                g.remove_edge(edge_other_direction);
-                //
-                four_copies.push(new_node);
-            }
-
-            // add four directions to the directional nodes hashmap
-            // note that here the list of nodes should be in clockwise order of the directions of their edges
-            directional_nodes.insert(node_ix, four_copies);
-        }
-    }
-
-    // after we've set all the outgoing edges (and all 4 way intersections have the 4 clones), we can now align them so they come in to the correct node)
-    for (node, clones) in directional_nodes.iter() {
-        // for each incoming node to the original node, align it with the correct clone node
-        // note that at this point there shouldn't be redundancy because we deleted the original edges after we added the cloned one
-        // for each incoming edge:
-        // find which clone node is the opposite direction
-        // from there, find the ones that go straight and turn right
-        // connect!
-    }
-}
-
-/**
-Returns neighbors of graph node in clockwise order by compass directions (which direction starts is whatever's closest to west)
-*/
-fn get_clockwise_order(
-    g: &Graph<Node, f32, Directed>,
-    center: NodeIndex,
-    neighbors: Vec<NodeIndex>,
-) -> Vec<NodeIndex> {
-    let center = g.node_weight(center).unwrap();
-    let mut neighbor_angles: Vec<(f64, NodeIndex)> = neighbors
-        .into_iter()
-        .map(|neighbor_node| {
-            let node = g.node_weight(neighbor_node).unwrap();
-            let dx = node.lon() - center.lon();
-            let dy = node.lat() - center.lat();
-            let angle = dy.atan2(dx);
-            (angle, neighbor_node)
-        })
-        .collect();
-
-    neighbor_angles.sort_by(|a, b| (-a.0).partial_cmp(&(-b.0)).unwrap());
-    neighbor_angles
-        .into_iter()
-        .map(|(_angle, node_ix)| node_ix)
-        .collect()
-}
-
 /**
 Takes pairings of neighbors/internal nodes and returns them sorted such that the neighbors are arranged clockwise around the given center (starting with whichever is in the northwest quadrant closest to west)
 */
@@ -896,25 +832,25 @@ fn prohibit_left_turns(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Direc
     let mut g = g.clone();
     let clones = create_clones(&mut g);
     let outgoing_edges = add_outgoing_edges(&mut g, clones);
-/*
-    println!("MADE EDGES: ");
-    for node_ix in g.node_indices() {
-        println!("id: {}, ix: {}, neighbors: {}", g.node_weight(node_ix).unwrap().id.0, node_ix.index(), g.neighbors(node_ix).count());
-    }
-    println!("RESULT OF OUTGOING_EDGES: ");
-    for (node_ix,edges) in outgoing_edges {
-        println!("id: {}, ix: {}, neighbors: {}", g.node_weight(node_ix).unwrap().id.0, node_ix.index(), g.neighbors(node_ix).count());
-        for edge in edges {
-            let (start,end) = g.edge_endpoints(edge).unwrap();
-            let start_osm = g.node_weight(start).unwrap().id.0;
-            let end_osm = g.node_weight(end).unwrap().id.0;
-            println!("\t(id:{},ix:{} -> id:{},ix:{})", start_osm, start.index(), end_osm, end.index());
+    /*
+        println!("MADE EDGES: ");
+        for node_ix in g.node_indices() {
+            println!("id: {}, ix: {}, neighbors: {}", g.node_weight(node_ix).unwrap().id.0, node_ix.index(), g.neighbors(node_ix).count());
         }
-    }
-*/
+        println!("RESULT OF OUTGOING_EDGES: ");
+        for (node_ix,edges) in outgoing_edges {
+            println!("id: {}, ix: {}, neighbors: {}", g.node_weight(node_ix).unwrap().id.0, node_ix.index(), g.neighbors(node_ix).count());
+            for edge in edges {
+                let (start,end) = g.edge_endpoints(edge).unwrap();
+                let start_osm = g.node_weight(start).unwrap().id.0;
+                let end_osm = g.node_weight(end).unwrap().id.0;
+                println!("\t(id:{},ix:{} -> id:{},ix:{})", start_osm, start.index(), end_osm, end.index());
+            }
+        }
+    */
     let intersections = make_intersection_objs(&mut g, outgoing_edges);
 
-/*
+    /*
     println!("INTERSECTIONS");
     for (node_ix,fourway) in intersections {
         println!("id: {}, ix: {}, neighbors: {}", g.node_weight(node_ix).unwrap().id.0, node_ix.index(), g.neighbors(node_ix).count());
@@ -939,7 +875,7 @@ fn prohibit_left_turns(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Direc
     */
 
     add_incoming_edges(&mut g, &intersections);
-/*
+    /*
     println!("AFTER MAKING INCOMING EDGES:");
     for edge in g.edge_indices() {
         let (start,end) = g.edge_endpoints(edge).unwrap();
@@ -1028,14 +964,30 @@ fn add_incoming_edges(
             if neighbor.index() == 0 {
                 //assert_eq!(right.index(), 10);
                 println!("IF NEIGHBOR IS 3");
-                println!("orig_node: (id:{},ix:{}), neighbor: (id:{},ix:{})", g.node_weight(orig_node).unwrap().id.0, orig_node.index(), g.node_weight(neighbor).unwrap().id.0, neighbor.index());
-                println!("straight across: (id:{},ix:{})",g.node_weight(straight_across).unwrap().id.0, straight_across.index());
-                println!("right: (id:{},ix:{})",g.node_weight(right).unwrap().id.0, right.index());
+                println!(
+                    "orig_node: (id:{},ix:{}), neighbor: (id:{},ix:{})",
+                    g.node_weight(orig_node).unwrap().id.0,
+                    orig_node.index(),
+                    g.node_weight(neighbor).unwrap().id.0,
+                    neighbor.index()
+                );
+                println!(
+                    "straight across: (id:{},ix:{})",
+                    g.node_weight(straight_across).unwrap().id.0,
+                    straight_across.index()
+                );
+                println!(
+                    "right: (id:{},ix:{})",
+                    g.node_weight(right).unwrap().id.0,
+                    right.index()
+                );
             }
-            if (intersections.contains_key(&neighbor)) {
+            if intersections.contains_key(&neighbor) {
                 // handle case where the neighbor is a FourWay intersection
                 // if so, you have to fetch the correct clone from that neighbor's FourWay intersection object
-                if neighbor.index() == 0 {println!("neighbor is a fourway");} // TEST
+                if neighbor.index() == 0 {
+                    println!("neighbor is a fourway");
+                } // TEST
                 let neighbor_clone = intersections
                     .get(&neighbor)
                     .unwrap()
@@ -1051,19 +1003,6 @@ fn add_incoming_edges(
         }
     }
 }
-
-// TEST
-fn add_basic_incoming_edges(g: &mut Graph<Node, f32, Directed>,
-                            intersections: &HashMap<NodeIndex, Vec<NodeIndex>,RandomState>) {
-
-/*
-    let foo = intersections.keys()
-        .flat_map(|&intersection| g.neighbors(intersection).collect_vec())
-        .filter(|neighbor| !intersections.contains_key(neighbor))
-        .for_each()
-        .collect_vec();*/
-}
-// END TEST
 
 fn delete_orig_nodes(
     g: &mut Graph<Node, f32, Directed>,
@@ -1127,7 +1066,7 @@ impl FourWay {
     Same as get_straight_across but for right turns
     */
     pub fn get_right_turn(&self, n: NodeIndex) -> Option<NodeIndex> {
-        assert_eq!(self.neighbors.len(),4);
+        assert_eq!(self.neighbors.len(), 4);
         let index = self.neighbors.iter().position(|x| x.0.eq(&n)).unwrap();
         let right_ix = (index + 3) % 4;
         Some(self.neighbors[right_ix].1)
@@ -1139,6 +1078,138 @@ impl FourWay {
     }
 }
 
+fn prohibit_left_turns2(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
+    // make the new graph
+    // simultaneously for each road node create
+    //      a RoadNode object, its implementation depending on the neighbor count
+    //      clones in the new graph (accessible through the RoadNode object)
+    // if not a RoadNode object, then pass a tuple of
+    let mut new_g: Graph<Node, f32, Directed> = Graph::new();
+    //let clones_map: HashMap<NodeIndex,RoadNode,RandomState> = make_clones(g, &mut new_g);
+    //add_edges(g, &mut new_g, clones_map);
+
+    // to construct itself it needs access to the coordineate of all the points which means giving it either the nodes themselvs or the node_indices plus the graph\\//
+    // it also needs to store the node indices of the clones
+    // it also needs to store the osm ids of the neighbors mapped to those clones
+    // however, no edges need to be made yet, which clone goes with which neighbor is randomly assigned on construction and the clone list is then sorted
+    // args: (vec<neighbor_nodes>, vec<clone_indices>, center_node)
+    // get_clones args: (osm_id) -> Vec<clone_indices>
+    // need a
+
+    // add_edges:
+    //      for each original node in graph, look up its RoadNode (cur_rn)
+    //      for each neighbor
+    //          look up original edge weight
+    //          look up the RoadNode of that neighbor (neighbor_rn)
+    //          look up the clone that points in that direction (osm_id)
+    //          using neighbor_rn, enter the osm id for this node and get back clones to connect to (Vec<NodeIndex>)
+    //          add edges for each (nodeindex,penalty) you get back
+    new_g
+}
+
+
+/*
+fn make_clones(g: &Graph<Node,f32,Directed>, new_g: &mut Graph<Node,f32,Directed>) -> HashMap<NodeIndex,impl RoadNode,RandomState> {
+    HashMap::new()
+}
+
+fn add_edges(g: &Graph<Node,f32,Directed>, new_g: &mut Graph<Node,f32,Directed>, road_nodes: HashMap<NodeIndex,Box<RoadNode>,RandomState>) {
+
+}*/
+
+// instead of the RoadNode we do this:
+// hashmap of NodeIndex (orig) to Vec<(NodeIndex,NodeIndex)>
+//
+
+/**
+While building our new graph, any given road node will have its own rules about how incoming edges should be linked to outgoing edges, depending on the type of intersection (four way, t intersection, just a point on the road). This trait takes a neighbor node index in the original graph and then returns what clones it should connect to, with the associated penalties (such as penalizing left turns or u-turns).
+*/
+trait RoadNode {
+    fn osm_id(&self) -> Node;
+    fn get_clones_and_penalties(&self, neighbor: NodeIndex) -> Vec<(NodeIndex, f32)>;
+}
+
+struct FourWay2 {
+    osm_id: Node,
+    neighbors: Vec<(Node, NodeIndex)>, // (neighbor osm_id, clone that will point to that neighbor)
+}
+
+impl FourWay2 {
+    pub fn new(
+        neighbor_osm_nodes: Vec<Node>,
+        center: Node,
+        clone_indices: Vec<NodeIndex>,
+    ) -> FourWay2 {
+        let neighbors: Vec<(Node, NodeIndex)> = neighbor_osm_nodes
+            .into_iter()
+            .zip(clone_indices.into_iter())
+            .collect();
+        let neighbors = sort_clockwise(&center, &neighbors);
+        FourWay2 {
+            osm_id: center,
+            neighbors,
+        }
+    }
+
+    /**
+    Given a neighbor of this intersection, it returns the internal node representing going straight (if coming from that neighbor). If the argument supplied isn't actually one of the neighbors stored in the FourWayIntersection, this will panic.
+    */
+    pub fn get_straight_across(&self, neighbor: Node) -> Option<NodeIndex> {
+        let neighbor_ix = self
+            .neighbors
+            .iter()
+            .position(|x| x.0.eq(&neighbor))
+            .unwrap();
+        let straight_across_ix = (neighbor_ix + 2) % 4;
+        Some(self.neighbors[straight_across_ix].1)
+    }
+
+    /**
+    Same as get_straight_across but for left turns.
+    */
+    pub fn get_left_turn(&self, n: Node) -> Option<NodeIndex> {
+        let index = self.neighbors.iter().position(|x| x.0.eq(&n)).unwrap();
+        let left_ix = (index + 1) % 4;
+        Some(self.neighbors[left_ix].1)
+    }
+
+    /**
+    Same as get_straight_across but for right turns
+    */
+    pub fn get_right_turn(&self, n: Node) -> Option<NodeIndex> {
+        assert_eq!(self.neighbors.len(), 4);
+        let index = self.neighbors.iter().position(|x| x.0.eq(&n)).unwrap();
+        let right_ix = (index + 3) % 4;
+        Some(self.neighbors[right_ix].1)
+    }
+
+    pub fn get_back(&self, n: Node) -> Option<NodeIndex> {
+        let index = self.neighbors.iter().position(|x| x.0.eq(&n)).unwrap();
+        Some(self.neighbors[index].1)
+    }
+}
+
+impl RoadNode for FourWay2 {
+    fn osm_id(&self) -> Node {
+        Node {
+            id: NodeId(0),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        }
+    }
+
+    fn get_clones_and_penalties(&self, neighbor: NodeIndex) -> Vec<(NodeIndex, f32)> {
+        Vec::new()
+    }
+}
+
+fn sort_clockwise(
+    center: &Node,
+    neighbors_and_clones: &Vec<(Node, NodeIndex)>,
+) -> Vec<(Node, NodeIndex)> {
+    Vec::new()
+}
 
 /**
 TODO: put in separate file
@@ -1146,9 +1217,7 @@ TODO: put in separate file
 mod tests {
     use super::*;
 
-
-
-/*
+    /*
     // TESTS FOR CONSTRUCTING TURN LIMITED GRAPH
     #[test]
     fn test_empty_graph_construction() {
@@ -1892,7 +1961,6 @@ mod tests {
         test_graph.add_edge(node2, center, 1.0);
         test_graph.add_edge(node4, center, 1.0);
 
-
         let result = prohibit_left_turns(&test_graph);
         /*println!("TEST FOUR WAY ");
         for edge in result.edge_indices() {
@@ -1974,21 +2042,26 @@ mod tests {
         test_graph.add_edge(node3, center, 1.0);
         test_graph.add_edge(node4, center, 1.0);
 
-        test_graph.add_edge(node3,node5, 1.0);
-        test_graph.add_edge(node3,node6,1.0);
-        test_graph.add_edge(node3,node7,1.0);
-        test_graph.add_edge(node5,node3,1.0);
-        test_graph.add_edge(node6,node3,1.0);
-        test_graph.add_edge(node7,node3,1.0);
-
+        test_graph.add_edge(node3, node5, 1.0);
+        test_graph.add_edge(node3, node6, 1.0);
+        test_graph.add_edge(node3, node7, 1.0);
+        test_graph.add_edge(node5, node3, 1.0);
+        test_graph.add_edge(node6, node3, 1.0);
+        test_graph.add_edge(node7, node3, 1.0);
 
         let result = prohibit_left_turns(&test_graph);
         println!("TEST TWO FOURWAYS");
         for edge in result.edge_indices() {
-            let (start,end) = result.edge_endpoints(edge).unwrap();
+            let (start, end) = result.edge_endpoints(edge).unwrap();
             let start_osm = result.node_weight(start).unwrap().id.0;
             let end_osm = result.node_weight(end).unwrap().id.0;
-            println!("({},{})->({},{})", start_osm, start.index(), end_osm, end.index());
+            println!(
+                "({},{})->({},{})",
+                start_osm,
+                start.index(),
+                end_osm,
+                end.index()
+            );
         }
         assert_eq!(14, result.node_count());
         assert_eq!(21, result.edge_count());
@@ -2040,18 +2113,23 @@ mod tests {
         let clone_to_south = test_graph.add_node(center.clone());
 
         let mut edges = Vec::new();
-        edges.push(test_graph.add_edge(clone_to_north,north_ix, 1.0));
-        edges.push(test_graph.add_edge(clone_to_east,east_ix, 1.0));
-        edges.push(test_graph.add_edge(clone_to_west,west_ix, 1.0));
-        edges.push(test_graph.add_edge(clone_to_south,south_ix, 1.0));
-
+        edges.push(test_graph.add_edge(clone_to_north, north_ix, 1.0));
+        edges.push(test_graph.add_edge(clone_to_east, east_ix, 1.0));
+        edges.push(test_graph.add_edge(clone_to_west, west_ix, 1.0));
+        edges.push(test_graph.add_edge(clone_to_south, south_ix, 1.0));
 
         let result = FourWay::new(&test_graph, cent, edges);
         // TEST GOING STRAIGHT ACROSS
         assert_eq!(clone_to_west, result.get_straight_across(east_ix).unwrap());
-        assert_eq!(clone_to_north, result.get_straight_across(south_ix).unwrap());
+        assert_eq!(
+            clone_to_north,
+            result.get_straight_across(south_ix).unwrap()
+        );
         assert_eq!(clone_to_east, result.get_straight_across(west_ix).unwrap());
-        assert_eq!(clone_to_south, result.get_straight_across(north_ix).unwrap());
+        assert_eq!(
+            clone_to_south,
+            result.get_straight_across(north_ix).unwrap()
+        );
         // TEST TURNING RIGHT
         assert_eq!(clone_to_west, result.get_right_turn(north_ix).unwrap());
         assert_eq!(clone_to_north, result.get_right_turn(east_ix).unwrap());
@@ -2067,8 +2145,62 @@ mod tests {
         assert_eq!(clone_to_north, result.get_back(north_ix).unwrap());
         assert_eq!(clone_to_east, result.get_back(east_ix).unwrap());
         assert_eq!(clone_to_south, result.get_back(south_ix).unwrap());
-
-
     }
 
+    #[test]
+    fn test_clockwise() {
+        let center: Node = Node {
+            id: NodeId(0),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        };
+        let west: Node = (
+            Node {
+                id: NodeId(1),
+                tags: Default::default(),
+                decimicro_lat: 1,
+                decimicro_lon: -10,
+            },
+            NodeIndex::new(0),
+        );
+        let north: Node = (
+            Node {
+                id: NodeId(2),
+                tags: Default::default(),
+                decimicro_lat: 10,
+                decimicro_lon: 1,
+            },
+            NodeIndex::new(0),
+        );
+        let east: Node = (
+            Node {
+                id: NodeId(3),
+                tags: Default::default(),
+                decimicro_lat: -1,
+                decimicro_lon: 10,
+            },
+            NodeIndex::new(0),
+        );
+        let south: Node = (
+            Node {
+                id: NodeId(4),
+                tags: Default::default(),
+                decimicro_lat: -10,
+                decimicro_lon: -1,
+            },
+            NodeIndex::new(0),
+        );
+        let mut neighbors_and_clones = Vec::new();
+        neighbors_and_clones.push(south.clone());
+        neighbors_and_clones.push(west.clone());
+        neighbors_and_clones.push(east.clone());
+        neighbors_and_clones.push(north.clone());
+
+        let mut exp_result = Vec::new();
+        exp_result.push(west);
+        exp_result.push(north);
+        exp_result.push(east);
+        exp_result.push(south);
+    }
 }
