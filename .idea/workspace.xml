@@ -22,13 +22,17 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="150">
-              <caret line="1140" selection-start-line="1140" selection-end-line="1140" />
+            <state relative-caret-position="79">
+              <caret line="355" column="5" lean-forward="true" selection-start-line="355" selection-start-column="5" selection-end-line="355" selection-end-column="5" />
               <folding>
                 <element signature="e#2984#2985#0" expanded="true" />
                 <element signature="e#3016#3017#0" expanded="true" />
-                <element signature="e#29904#29905#0" expanded="true" />
-                <element signature="e#29940#29941#0" expanded="true" />
+                <element signature="e#27548#27549#0" expanded="true" />
+                <element signature="e#27584#27585#0" expanded="true" />
+                <element signature="e#47967#47968#0" expanded="true" />
+                <element signature="e#47984#47985#0" expanded="true" />
+                <element signature="e#50186#50187#0" expanded="true" />
+                <element signature="e#50238#50239#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -125,19 +129,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>&amp;mut</find>
-      <find>edge_ix</find>
-      <find>partial</find>
-      <find>&gt;</find>
-      <find>weight</find>
-      <find>OrderedF</find>
-      <find>Float::</find>
-      <find>std::</find>
-      <find>max</find>
-      <find>println</find>
-      <find>Internal Node</find>
-      <find>prior_node</find>
-      <find>find</find>
       <find>filter</find>
       <find>djikstra</find>
       <find>djiks</find>
@@ -150,11 +141,24 @@
       <find>sorted_by</find>
       <find>get_right</find>
       <find>assert_eq!</find>
-      <find>FourWay</find>
       <find>INTERSEC</find>
       <find>struct FourWay</find>
       <find>add_inc</find>
       <find>TEST</find>
+      <find>prohibit_lef</find>
+      <find>trait</find>
+      <find>clockwise</find>
+      <find>clockwise_order</find>
+      <find>NodeIndex::</find>
+      <find>&amp;Road</find>
+      <find>clones_and</find>
+      <find>Node::</find>
+      <find>RoadNode {</find>
+      <find>RoadNode</find>
+      <find>new</find>
+      <find>RoadNode</find>
+      <find>neighbor_cl</find>
+      <find>FourWay</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -381,11 +385,26 @@
       <option name="project" value="LOCAL" />
       <updated>1575642365623</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="About to try redoing it, as I need to better handle cases like 2 and 3 way intersections, and it's easier to redo the modified graph construction again.">
+      <created>1576096802246</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1576096802248</updated>
+    </task>
+    <task id="LOCAL-00013" summary="attempting to make a trait object for road nodes, where it internally figures out for each road node how it should penalize/connect incoming edges with outgoing. Might be different one for different cases, and default value for cases I don't think of.">
+      <created>1576110175223</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1576110175223</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="16" y="23" width="1322" height="637" extended-state="0" />
+    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.3082942" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -480,7 +499,9 @@
     <MESSAGE value="Nearly complete with right_turns_only. The modified graph is built correctly, and I have a function to create a &quot;difference graph&quot;, but I need to write the function that takes the min distance info and transforms into an Undirected graph" />
     <MESSAGE value="Have written the function that takes the min-distance data and the modified graph and creates a simpler graph with just undirected edges representing average min distance of the end points. Started adding tests for this as this program as these functions are definitely non-trivial" />
     <MESSAGE value="Have written the function that takes the min-distance data and the modified graph and creates a simpler graph with just undirected edges representing average min distance of the end points. Started adding tests for this as this program as these functions are definitely non-trivial. Am also about to delete some unnecessary stuff at the bottom of the file I had forgotten about." />
-    <option name="LAST_COMMIT_MESSAGE" value="Have written the function that takes the min-distance data and the modified graph and creates a simpler graph with just undirected edges representing average min distance of the end points. Started adding tests for this as this program as these functions are definitely non-trivial. Am also about to delete some unnecessary stuff at the bottom of the file I had forgotten about." />
+    <MESSAGE value="About to try redoing it, as I need to better handle cases like 2 and 3 way intersections, and it's easier to redo the modified graph construction again." />
+    <MESSAGE value="attempting to make a trait object for road nodes, where it internally figures out for each road node how it should penalize/connect incoming edges with outgoing. Might be different one for different cases, and default value for cases I don't think of." />
+    <option name="LAST_COMMIT_MESSAGE" value="attempting to make a trait object for road nodes, where it internally figures out for each road node how it should penalize/connect incoming edges with outgoing. Might be different one for different cases, and default value for cases I don't think of." />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
@@ -869,13 +890,17 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="150">
-          <caret line="1140" selection-start-line="1140" selection-end-line="1140" />
+        <state relative-caret-position="79">
+          <caret line="355" column="5" lean-forward="true" selection-start-line="355" selection-start-column="5" selection-end-line="355" selection-end-column="5" />
           <folding>
             <element signature="e#2984#2985#0" expanded="true" />
             <element signature="e#3016#3017#0" expanded="true" />
-            <element signature="e#29904#29905#0" expanded="true" />
-            <element signature="e#29940#29941#0" expanded="true" />
+            <element signature="e#27548#27549#0" expanded="true" />
+            <element signature="e#27584#27585#0" expanded="true" />
+            <element signature="e#47967#47968#0" expanded="true" />
+            <element signature="e#47984#47985#0" expanded="true" />
+            <element signature="e#50186#50187#0" expanded="true" />
+            <element signature="e#50238#50239#0" expanded="true" />
           </folding>
         </state>
       </provider>
