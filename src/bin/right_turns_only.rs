@@ -832,115 +832,112 @@ fn get_clockwise_order2(
 
 fn prohibit_left_turns2(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
     let mut new_g: Graph<Node, f32, Directed> = Graph::new();
-    let orig_to_clones = add_clones(&g, &mut new_g);
-    add_edges(&g, &mut new_g, orig_to_clones);
+    let clone_data = add_clones(&g, &mut new_g);
+    add_edges(&g, &mut new_g, clone_data);
     new_g
-}
-
-fn add_edges(
-    g: &Graph<Node, f32, Directed>,
-    new_g: &mut Graph<Node, f32, Directed>,
-    orig_to_clones: HashMap<NodeIndex, RoadNode, RandomState>,
-) {
-    for (node_ix, road_node) in orig_to_clones {
-        // fetch the neighbors of this clone
-        for neighbor in g.neighbors(node_ix) {
-            let neighbor_osm_node = g.node_weight(neighbor).unwrap().clone();
-            let clones = road_node.get_clones(neighbor_osm_node);
-        }
-    }
-    /*
-    let edges_to_add = orig_to_clones.iter()
-        .map(|(&node_ix,&road_node)| {
-            g.neighbors(node_ix)
-                .map(|neighbor|{
-                    let neighbor_osm_node = *g.node_weight(neighbor).unwrap();
-                    road_node.get_clones(neighbor_osm_node).into_iter()
-                        .flat_map(|(clone,penalty)|{
-                            let neighbor_road_clone = orig_to_clones.get(&neighbor).unwrap();
-                            let neighbor_clone = neighbor_road_clone.get_u_turn(g.node_weight(node_ix).unwrap());
-                            // TODO: finish this part
-                        }
-                        )
-                })
-                .map(|neighbor_osm_node| )
-        }
-        )*/
 }
 
 fn add_clones(
     g: &Graph<Node, f32, Directed>,
     new_g: &mut Graph<Node, f32, Directed>,
-) -> HashMap<NodeIndex, RoadNode> {
-    // for each node in g create clones, bundle into a RoadNode, then return the hash from original graph nodes to the RoadNode
-    HashMap::new()
+) -> HashMap<NodeIndex, CloneList> {
+    // for each node in g create clones, bundle into a CloneList, then return the hash from original graph nodes to the CloneList
+    let mut ret = HashMap::new();
+    for node_ix in g.node_indices() {
+        // need to get num neighbors, add that many clones, put neighbors/clones in vecs, make CloneList object, then add to hashmap
+        let neighbors: Vec<Node> = g
+            .neighbors(node_ix)
+            .map(|neighbor_ix| g.node_weight(neighbor_ix).unwrap().clone())
+            .collect();
+        let center = g.node_weight(node_ix).unwrap().clone();
+        let mut clones = Vec::new();
+        for i in 0..neighbors.len() {
+            clones.push(new_g.add_node(center.clone()));
+        }
+        ret.insert(node_ix, CloneList::new(center, neighbors, clones));
+    }
+    ret
 }
 
-// instead of the RoadNode we do this:
-// hashmap of NodeIndex (orig) to Vec<(NodeIndex,NodeIndex)>
-//
-
-fn sort_clockwise(
-    center: &Node,
-    neighbors_and_clones: &Vec<(Node, NodeIndex)>,
-) -> Vec<(Node, NodeIndex)> {
-    let mut neighbor_angles: Vec<(f64, (Node,NodeIndex))> = neighbors_and_clones
-        .iter()
-        .map(|(neighbor_node, clone_ix)| {
-            let dx = neighbor_node.lon() - center.lon();
-            let dy = neighbor_node.lat() - center.lat();
-            let angle = dy.atan2(dx);
-            (angle, (neighbor_node.clone(), *clone_ix))
-        })
-        .collect();
-    neighbor_angles.sort_by(|a, b| (-a.0).partial_cmp(&(-b.0)).unwrap());
-    neighbor_angles
-        .into_iter()
-        .map(|(_angle, neighbor_clone_tuple)| neighbor_clone_tuple)
-        .collect()
+fn add_edges(
+    g: &Graph<Node, f32, Directed>,
+    new_g: &mut Graph<Node, f32, Directed>,
+    clone_data: HashMap<NodeIndex, CloneList, RandomState>,
+) {
+    // for every node index in our original graph, we build the OUTGOING edge from that node
+    // we call this node the "source"  and its neighbors, the "targets"
+    for (&source_ix, clone_list) in &clone_data {
+        // for each neighboring node, we add all edges leaving this location (the "source") and pointing to that location (the "edge")
+        for neighbor in g.neighbors(source_ix) {
+            let source_clone_list = clone_list;
+            let target_clone_list = clone_data.get(&neighbor).unwrap();
+            let orig_edge_weight = g
+                .edge_weight(g.find_edge(source_ix, neighbor).unwrap())
+                .unwrap();
+            let source_osm = g.node_weight(source_ix).unwrap();
+            let target_osm = g.node_weight(neighbor).unwrap();
+            let source_clone = get_source_clone(target_osm, source_clone_list);
+            let target_clones = get_target_clones(source_osm, target_clone_list);
+            for (target_clone, penalty) in target_clones {
+                new_g.add_edge(source_clone, target_clone, orig_edge_weight + penalty);
+            }
+        }
+    }
 }
+
+fn get_source_clone(neighbor_osm: &Node, source_clone_list: &CloneList) -> NodeIndex {
+    source_clone_list.get_x_rotations_from(neighbor_osm,0)
+}
+
+fn get_target_clones(source_osm: &Node, target_clone_list: &CloneList) -> Vec<(NodeIndex, f32)> {
+    match target_clone_list.neighbor_clone_pairs.len() {
+        2 => {
+            // whether it's a dead end or a point in the middle of a road, we want the clone that isn't pointing back to source_osm
+            let clone = target_clone_list.get_x_rotations_from(source_osm,1);
+            vec!((clone,0.0))
+        }
+        4 => {
+            let left = target_clone_list.get_x_rotations_from(source_osm,1);
+            let straight = target_clone_list.get_x_rotations_from(source_osm,2);
+            let right = target_clone_list.get_x_rotations_from(source_osm,3);
+            vec!((left,LEFT_TURN_PENALTY), (straight, 0.0), (right,RIGHT_TURN_PENALTY))
+        }
+        _ => {
+            // TODO: make case for T intersections
+            // if an interseciton has more than 4 directions (unusual cases), then don't penalize any direction
+            target_clone_list.neighbor_clone_pairs.iter()
+                .map(|(_, clone)| (*clone,0.0))
+                .collect()
+        }
+    }
+}
+
+
 
 /**
-I wanted to use trait objects here for dynamic dispatch, (a trait for RoadNode and structs like "3Way" or "FourWay" or "t_intersection") but I couldn't figure out how to make it work in Rust.
+List of clones sorted by the direction of the neighbor they will eventually have an outgoing edge to. Sorted in clockwise order.
 */
-struct RoadNode {
-    center: Node,
+#[derive(Debug,PartialEq)]
+struct CloneList {
     neighbor_clone_pairs: Vec<(Node, NodeIndex)>,
+    //intersection_type:
 }
 
-impl RoadNode {
-    fn new(center: Node, neighbors: Vec<Node>, clones: Vec<NodeIndex>) -> RoadNode {
+impl CloneList {
+    fn new(center: Node, neighbors: Vec<Node>, clones: Vec<NodeIndex>) -> CloneList {
         assert_eq!(neighbors.len(), clones.len());
         let mut neighbor_clone_pairs: Vec<(Node, NodeIndex)> =
             neighbors.into_iter().zip(clones.into_iter()).collect();
         neighbor_clone_pairs = sort_clockwise(&center, &neighbor_clone_pairs);
-
-        RoadNode {
-            center,
+        CloneList {
             neighbor_clone_pairs,
         }
     }
-
-    fn get_clones(&self, neighbor: Node) -> Vec<(NodeIndex, f32)> {
-        let mut ret = Vec::new();
-        let num_neighbors = self.neighbor_clone_pairs.len();
-        if num_neighbors == 2 {
-            let uturn_clone = self.get_x_rotations_from(&neighbor, 0);
-            let straight_ahead_clone = self.get_x_rotations_from(&neighbor, 1);
-            vec![
-                (uturn_clone, UTURN_PENALTY),
-                (straight_ahead_clone, STRAIGHT_PENALTY),
-            ];
-        } else if num_neighbors == 4 {
-
-        } else {
-
-        }
-        ret
-    }
     /**
+    Helper method for accessing clones.
+
     Assuming the "neighbor" argument is in fact one of the neighbors of this intersection, this provides the clone pointing in a new direction (the direction x clockwise rotations away from this neighbor).
-    For example, in a 4 way intersection, if neighbor represents the neighbor to the west of the intersection, and you let x=3, then what will be returned is the clone pointing to the south neighbor (3 rotations away).
+    For example, in a 4 way intersection, if "neighbor" is the neighbor to the west of the intersection, and you let x=3, then this will return the clone pointing to the south neighbor (3 rotations away).
 
     If the neighbor argument isn't actually a neighbor of this intersection, then this will panic.
     */
@@ -956,11 +953,28 @@ impl RoadNode {
             .unwrap()
             .1
     }
-
-    fn get_u_turn(&self, neighbor: &Node) -> NodeIndex {
-        self.get_x_rotations_from(neighbor, 0)
-    }
 }
+
+fn sort_clockwise(
+    center: &Node,
+    neighbors_and_clones: &Vec<(Node, NodeIndex)>,
+) -> Vec<(Node, NodeIndex)> {
+    let mut neighbor_angles: Vec<(f64, (Node, NodeIndex))> = neighbors_and_clones
+        .iter()
+        .map(|(neighbor_node, clone_ix)| {
+            let dx = neighbor_node.lon() - center.lon();
+            let dy = neighbor_node.lat() - center.lat();
+            let angle = dy.atan2(dx);
+            (angle, (neighbor_node.clone(), *clone_ix))
+        })
+        .collect();
+    neighbor_angles.sort_by(|a, b| (-a.0).partial_cmp(&(-b.0)).unwrap());
+    neighbor_angles
+        .into_iter()
+        .map(|(_angle, neighbor_clone_tuple)| neighbor_clone_tuple)
+        .collect()
+}
+
 
 /**
 TODO: put in separate file
@@ -1959,6 +1973,64 @@ mod tests {
         assert_eq!(result, exp_result);
     }
 
+    #[test]
+    fn test_add_clones_temp() {
+        let n1: Node = Node {
+            id: NodeId(0),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: -10,
+        };
+        let n2: Node = Node {
+            id: NodeId(1),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        };
+        let n3: Node = Node {
+            id: NodeId(2),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 10,
+        };
+        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
+        let mut new_graph: Graph<Node, f32, Directed> = Graph::new();
+        let mut exp_result = HashMap::new();
+        let result = add_clones(&orig_graph,&mut new_graph);
+        assert_eq!(exp_result, result);
+
+        orig_graph.clear();
+        new_graph.clear();
+        orig_graph.add_node(n1.clone());
+        exp_result = HashMap::new();
+        exp_result.insert(NodeIndex::new(0), CloneList::new(n1.clone(), Vec::new(), Vec::new()));//TODO: make exp_result -> {NodeIndex(0): CloneList { neighbor_clone_pairs: [] }}
+        let result = add_clones(&orig_graph,&mut new_graph);
+        assert_eq!(exp_result, result);
+
+
+        orig_graph.clear();
+        new_graph.clear();
+        let node1 = orig_graph.add_node(n1.clone());
+        let node2 = orig_graph.add_node(n2.clone());
+        orig_graph.add_edge(node1,node2,3.0);
+        let result = add_clones(&orig_graph, &mut new_graph);
+        assert_eq!(2, result.len());
+
+        orig_graph.clear();
+        new_graph.clear();
+        let node1 = orig_graph.add_node(n1.clone());
+        let node2 = orig_graph.add_node(n2.clone());
+        let node3 = orig_graph.add_node(n3.clone());
+        orig_graph.add_edge(node1,node2,3.0);
+        orig_graph.add_edge(node2,node3,3.0);
+        orig_graph.add_edge(node3,node1,3.0);
+        let result = add_clones(&orig_graph, &mut new_graph);
+        assert_eq!(3, result.len());
+        assert!(result.contains_key(&node1));
+        assert!(result.contains_key(&node2));
+        assert!(result.contains_key(&node3));
+    }
+
     /**
     This just tests to make sure I'm correctly using petgraph's algorithm to test for graph isomorphism
     */
@@ -2038,6 +2110,14 @@ mod tests {
         };
         orig_graph.add_node(center);
         modified_graph = prohibit_left_turns2(&orig_graph);
+        println!("ORIG GRAPH");
+        for node_ix in orig_graph.node_indices() {
+            println!("(osm:{},ix:{})", orig_graph.node_weight(node_ix).unwrap().id.0, node_ix.index());
+        }
+        println!("MODIFIED GRAPH");
+        for node_ix in modified_graph.node_indices() {
+            println!("(osm:{},ix:{})", modified_graph.node_weight(node_ix).unwrap().id.0, node_ix.index());
+        }
         assert!(is_isomorphic_matching(
             &orig_graph,
             &modified_graph,
@@ -2152,6 +2232,8 @@ mod tests {
         ));
     }
 
+
+
     /**
     Write test for a single fourway intersection
     */
@@ -2246,6 +2328,173 @@ mod tests {
         exp_result.add_edge(south_in, clone_to_north, 4.0); // straight
         exp_result.add_edge(south_in, clone_to_east, 4.0 + RIGHT_TURN_PENALTY);
 
+        let result = prohibit_left_turns2(&orig_graph);
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
+    }
+
+
+
+    #[test]
+    fn test_adjacent_fourways_graph_construction() {
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+
+        // node objects
+        let center_node1: Node = Node {
+            id: NodeId(0),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        };
+        let west_node: Node = Node {
+            id: NodeId(1),
+            tags: Default::default(),
+            decimicro_lat: 1,
+            decimicro_lon: -10,
+        };
+        let north_node1: Node = Node {
+            id: NodeId(2),
+            tags: Default::default(),
+            decimicro_lat: 10,
+            decimicro_lon: 1,
+        };
+        let south_node1: Node = Node {
+            id: NodeId(4),
+            tags: Default::default(),
+            decimicro_lat: -10,
+            decimicro_lon: -1,
+        };
+        let center_node2: Node = Node {
+            id: NodeId(3),
+            tags: Default::default(),
+            decimicro_lat: -1,
+            decimicro_lon: 10,
+        };
+        let north_node2: Node = Node {
+            id: NodeId(4),
+            tags: Default::default(),
+            decimicro_lat: 10,
+            decimicro_lon: 10,
+        };
+        let east_node: Node = Node {
+            id: NodeId(4),
+            tags: Default::default(),
+            decimicro_lat: 1,
+            decimicro_lon: 20,
+        };
+        let south_node2: Node = Node {
+            id: NodeId(4),
+            tags: Default::default(),
+            decimicro_lat: -10,
+            decimicro_lon: 10,
+        };
+
+        // build original graph
+        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
+        let c1 = orig_graph.add_node(center_node1.clone());
+        let w = orig_graph.add_node(west_node.clone());
+        let n1 = orig_graph.add_node(north_node1.clone());
+        let s1 = orig_graph.add_node(south_node1.clone());
+        let c2 = orig_graph.add_node(center_node2.clone());
+        let n2 = orig_graph.add_node(north_node2.clone());
+        let e = orig_graph.add_node(east_node.clone());
+        let s2 = orig_graph.add_node(south_node2.clone());
+
+        orig_graph.add_edge(c1, w, 1.0);
+        orig_graph.add_edge(w, c1, 1.0);
+        orig_graph.add_edge(c1, n1, 2.0);
+        orig_graph.add_edge(n1, c1, 2.0);
+        orig_graph.add_edge(c1, s1, 3.0);
+        orig_graph.add_edge(s1, c1, 3.0);
+        orig_graph.add_edge(c1, c2, 4.0);
+        orig_graph.add_edge(c2, c1, 4.0);
+
+        orig_graph.add_edge(c2, n2, 5.0);
+        orig_graph.add_edge(n2, c2, 5.0);
+        orig_graph.add_edge(c2, e, 6.0);
+        orig_graph.add_edge(e, c2, 6.0);
+        orig_graph.add_edge(c2, s2, 7.0);
+        orig_graph.add_edge(s2, c2, 7.0);
+
+        // build exp_result graph
+        let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
+        let c1_w = exp_result.add_node(center_node1.clone());
+        let c1_n = exp_result.add_node(center_node1.clone());
+        let c1_e = exp_result.add_node(center_node1.clone());
+        let c1_s = exp_result.add_node(center_node1.clone());
+
+        let w_1 = exp_result.add_node(west_node.clone());
+        let w_2 = exp_result.add_node(west_node.clone());
+
+        let n1_1 = exp_result.add_node(north_node1.clone());
+        let n1_2 = exp_result.add_node(north_node1.clone());
+
+        let s1_1 = exp_result.add_node(south_node1.clone());
+        let s1_2 = exp_result.add_node(south_node1.clone());
+
+        let c2_w = exp_result.add_node(center_node2.clone());
+        let c2_n = exp_result.add_node(center_node2.clone());
+        let c2_e = exp_result.add_node(center_node2.clone());
+        let c2_s = exp_result.add_node(center_node2.clone());
+
+        let n2_1 = exp_result.add_node(north_node2.clone());
+        let n2_2 = exp_result.add_node(north_node2.clone());
+
+        let e_1 = exp_result.add_node(east_node.clone());
+        let e_2 = exp_result.add_node(east_node.clone());
+
+        let s2_1 = exp_result.add_node(south_node2.clone());
+        let s2_2 = exp_result.add_node(south_node2.clone());
+        // make edges (ugh)
+        // outgoing edges from c1 (but not to c2)
+        exp_result.add_edge(c1_w, w_1, 1.0);
+        exp_result.add_edge(c1_n, n1_1, 2.0);
+        exp_result.add_edge(c1_s, s1_1, 3.0);
+        // add incoming edges to c1 (except from c2)
+        exp_result.add_edge(w_2, c1_n, 1.0 + LEFT_TURN_PENALTY);
+        exp_result.add_edge(w_2, c1_e, 1.0);
+        exp_result.add_edge(w_2, c1_s, 1.0 + RIGHT_TURN_PENALTY);
+
+        exp_result.add_edge(n1_2, c1_w, 2.0 + RIGHT_TURN_PENALTY);
+        exp_result.add_edge(n1_2, c1_s, 2.0);
+        exp_result.add_edge(n1_2, c1_e, 2.0 + LEFT_TURN_PENALTY);
+
+        exp_result.add_edge(s1_2, c1_w, 3.0 + LEFT_TURN_PENALTY);
+        exp_result.add_edge(s1_2, c1_n, 3.0);
+        exp_result.add_edge(s1_2, c1_e, 3.0 + RIGHT_TURN_PENALTY);
+        // add edges between c1 and c2
+        exp_result.add_edge(c1_e, c2_n, 4.0 + LEFT_TURN_PENALTY);
+        exp_result.add_edge(c1_e, c2_e, 4.0);
+        exp_result.add_edge(c1_e, c2_s, 4.0 + RIGHT_TURN_PENALTY);
+
+        exp_result.add_edge(c2_w, c1_s, 4.0 + LEFT_TURN_PENALTY);
+        exp_result.add_edge(c2_w, c1_w, 4.0);
+        exp_result.add_edge(c2_w, c1_n, 4.0 + RIGHT_TURN_PENALTY);
+
+        // add outgoing edges from c2 (but not to c1)
+        exp_result.add_edge(c2_n, n2_1, 5.0);
+        exp_result.add_edge(c2_e, e_1, 6.0);
+        exp_result.add_edge(c2_s, s2_1, 7.0);
+        // add incoming edges into c2 (but not from c1)
+        exp_result.add_edge(n2_2, c2_w, 5.0 + RIGHT_TURN_PENALTY);
+        exp_result.add_edge(n2_2, c2_s, 5.0);
+        exp_result.add_edge(n2_2, c2_e, 5.0 + LEFT_TURN_PENALTY);
+
+        exp_result.add_edge(e_2, c2_n, 6.0 + RIGHT_TURN_PENALTY);
+        exp_result.add_edge(e_2, c2_w, 6.0);
+        exp_result.add_edge(e_2, c2_s, 6.0 + LEFT_TURN_PENALTY);
+
+        exp_result.add_edge(s2_2, c2_w, 7.0 + LEFT_TURN_PENALTY);
+        exp_result.add_edge(s2_2, c2_n, 7.0);
+        exp_result.add_edge(s2_2, c2_e, 7.0 + RIGHT_TURN_PENALTY);
+
+        // Test!
         let result = prohibit_left_turns2(&orig_graph);
         assert!(is_isomorphic_matching(
             &exp_result,
