@@ -228,12 +228,65 @@ fn model(app: &App) -> Model {
         }
     }
 
+    // TESTING
+    let mut num_zero = 0;
+    let mut num_one = 0;
+    let mut num_two = 0;
+    let mut num_three = 0;
+    let mut num_four = 0;
+    let mut num_five = 0;
+    let mut num_sixplus = 0;
+    let mut num_t = 0;
+    for node_ix in road_graph.node_indices() {
+        match road_graph.neighbors(node_ix).count() {
+            0 => num_zero+=1,
+            1 => num_one+=1,
+            2 => num_two+=1,
+            3 => {
+                num_three+=1;
+                let center = road_graph.node_weight(node_ix).unwrap();
+                let mut angles = Vec::new();
+                for neighbor in road_graph.neighbors(node_ix) {
+                    let angle = return_angle(&center, &road_graph.node_weight(neighbor).unwrap());
+                    angles.push(angle);
+                }
+                println!("angle:{}", biggest_angle_gap(angles));
+            },
+            4 => num_four+=1,
+            5 => num_five+=1,
+            _ => num_sixplus+=1
+        }
+    }
+    println!("0:{}, 1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6+:{}", num_zero, num_one, num_two, num_three, num_four, num_five, num_sixplus);
+    // TESTING
+
     let road_lines: Vec<Line> = color_roads(&road_graph);
 
     Model {
         _window,
         road_lines,
     }
+}
+
+fn return_angle(center: &Node, other: &Node) -> f64 {
+    let dx = other.lon() - center.lon();
+    let dy = other.lat() - center.lat();
+    dy.atan2(dx)
+}
+
+fn biggest_angle_gap(angles: Vec<f64>) -> f64 {
+    let mut sorted_angles = angles.clone();
+    sorted_angles.sort_by(|a,b| b.partial_cmp(a).unwrap());
+    let mut prev = 0.0;
+    let mut biggest = 0.0;
+    for (ix, angle) in sorted_angles.into_iter().enumerate() {
+        if ix==0 {prev = angle}
+        else {
+            let diff = prev-angle;
+            if diff > biggest {biggest = diff}
+        }
+    }
+    biggest
 }
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
