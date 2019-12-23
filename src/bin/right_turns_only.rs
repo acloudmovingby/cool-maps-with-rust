@@ -796,9 +796,8 @@ fn modify_graph(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
         // add edge while you do it
     // third pass: add edges for each
         // add internal edges
-    let mut new_g: Graph<Node, f32, Directed> = Graph::new();
     let mut clone_lists = identify_intersection_type(&g);
-    add_edges_external_to_intersection(&g, &mut new_g, &mut clone_lists);
+    let mut new_g = add_edges_external_to_intersection(&g, &mut clone_lists);
     add_internal_interesection_edges(&g, &mut new_g, clone_lists);
     new_g
 }
@@ -819,10 +818,14 @@ fn identify_intersection_type(g: &Graph<Node, f32, Directed>) -> HashMap<NodeInd
         })
 }
 
+/**
+Creates a new graph (new_g). For each edge in g, it takes the endpoints and makes clones of them in new_g and an edge connecting them, then stores these clones in the CloneLists. For every edge there will be two new clones added, so at a FourWay, for example, at the end there will be 8 clones for that one location (two for each incoming/outgoing edge leaving the interesction). another function later adds the internal edges between these clones (which will penalize certain turns).
+*/
 fn add_edges_external_to_intersection(
     g: &Graph<Node, f32, Directed>,
-    new_g: &mut Graph<Node, f32, Directed>, clone_data: &mut HashMap<NodeIndex, CloneList>
-) {
+    clone_data: &mut HashMap<NodeIndex, CloneList>
+) -> Graph<Node, f32, Directed> {
+    let mut new_g: Graph<Node, f32, Directed> = Graph::new();
     for edge in g.edge_indices() {
         // get all necessary info from the edge in the original graph
         let (source_ix,target_ix) = g.edge_endpoints(edge).unwrap();
@@ -839,10 +842,11 @@ fn add_edges_external_to_intersection(
         let target_clone_list = clone_data.get_mut(&target_ix).unwrap();
         target_clone_list.neighbor_clone_pairs.push(target_clone_ix);
     }
+    new_g
 }
 
 /**
-Intersections, like 4 ways, are represented by several internal nodes (all with the same OSM NodeId and coordinates). Each direction away from the intersection has a "incoming" and an "outgoing" node. This method connects the incoiming nodes to their respective outgoing nodes, adding a penalty if necessary. So, for example, if left turns are being penalized, then the incoming node from the west would connect to the outgoing node for the north, but with the left turn penalty added.
+Intersections, like FourWays, are represented by several internal nodes (all with the same OSM NodeId and coordinates). Each direction away from the intersection has a "incoming" and an "outgoing" node. This method connects the incoiming nodes to their respective outgoing nodes, adding a penalty if necessary. So, for example, if left turns are being penalized, then the incoming node from the west would connect to the outgoing node for the north, but with the left turn penalty added.
 */
 fn add_internal_interesection_edges(
     g: &Graph<Node, f32, Directed>,
@@ -852,25 +856,36 @@ fn add_internal_interesection_edges(
     // every "intersection" has a type and an associated list of clones. Handle each type differently
     for (orig_node, clone_list) in clone_data {
         match clone_list.intersection_type {
+
             IntersectionType::FourWay => {
+                println!("clone list: {:?}",&clone_list.neighbor_clone_pairs);
                 let center_osm_node = g.node_weight(orig_node).unwrap();
                 let incoming = get_incoming(&clone_list.neighbor_clone_pairs, new_g);
+
                 let incoming = pair_with_neighbor(&incoming,&new_g);
                 let outgoing = get_outgoing(&clone_list.neighbor_clone_pairs, new_g);
                 let outgoing = pair_with_neighbor(&outgoing,new_g);
                 let outgoing = sort_clockwise(center_osm_node,&outgoing);
+
+                println!("incoming:{:?}",incoming);
+                println!("outgoing:{:?}",outgoing);
                 for (neighbor,incoming_node) in incoming {
                     // for every direction
                     let index = outgoing.iter().position(|(a,b)| {
                         (neighbor).eq(a)
                     }).unwrap();
-                    let left = outgoing[index+1].1;
-                    let straight = outgoing[index+2].1;
-                    let right = outgoing[index+3].1;
+                    let left = outgoing[(index+1)%4].1;
+                    let straight = outgoing[(index+2)%4].1;
+                    let right = outgoing[(index+3)%4].1;
                     new_g.add_edge(incoming_node, left, LEFT_TURN_PENALTY);
                     new_g.add_edge(incoming_node, straight, STRAIGHT_PENALTY);
                     new_g.add_edge(incoming_node, right, RIGHT_TURN_PENALTY);
                 }
+            },
+            IntersectionType::Isolate => {
+                // because they have no edges, these isolated nodes were never added during add_edges_external_to_intersection(), but later we want our new graph to have the same osm_nodes as the original, so we copy the node here
+                let osm_node = g.node_weight(orig_node).unwrap().clone();
+                new_g.add_node(osm_node);
             },
             _ => {}
         }
@@ -1483,431 +1498,6 @@ mod tests {
         g2.add_edge(n1, n3, 1.0); // edge weight the same but the nodes are different
         assert!(!is_isomorphic_matching(&g1, &g2, node_match, edge_match));
     }
-/*
-    #[test]
-    fn test_clone_graph_trivial() {
-        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
-        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
-
-        // test on empty graph
-        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let mut modified_graph = modify_graph(&orig_graph);
-        assert!(is_isomorphic_matching(
-            &orig_graph,
-            &modified_graph,
-            node_match,
-            edge_match
-        ));
-
-        // test on graph with single node
-        let center: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        orig_graph.add_node(center);
-        modified_graph = modify_graph(&orig_graph);
-        println!("ORIG GRAPH");
-        for node_ix in orig_graph.node_indices() {
-            println!(
-                "(osm:{},ix:{})",
-                orig_graph.node_weight(node_ix).unwrap().id.0,
-                node_ix.index()
-            );
-        }
-        println!("MODIFIED GRAPH");
-        for node_ix in modified_graph.node_indices() {
-            println!(
-                "(osm:{},ix:{})",
-                modified_graph.node_weight(node_ix).unwrap().id.0,
-                node_ix.index()
-            );
-        }
-        assert!(is_isomorphic_matching(
-            &orig_graph,
-            &modified_graph,
-            node_match,
-            edge_match
-        ));
-    }
-
-    #[test]
-    fn test_clone_graph_two_nodes() {
-        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
-        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
-
-        // node objects
-        let n1: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: -10,
-        };
-        let n2: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 10,
-        };
-
-        // instantiate orig_graph and add nodes/edges
-        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let left = orig_graph.add_node(n1.clone());
-        let right = orig_graph.add_node(n2.clone());
-        orig_graph.add_edge(left, right, 1.0);
-        orig_graph.add_edge(right, left, 1.0);
-
-        // because you can make u-turns, each node needs to clones with the "uturn edge" going between them
-        let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
-        let left_clone1 = exp_result.add_node(n1.clone());
-        let left_clone2 = exp_result.add_node(n1.clone());
-        let right_clone1 = exp_result.add_node(n2.clone());
-        let right_clone2 = exp_result.add_node(n2.clone());
-        exp_result.add_edge(right_clone1, left_clone1, 1.0);
-        exp_result.add_edge(left_clone2, right_clone2, 1.0);
-
-        let result = modify_graph(&orig_graph);
-        assert!(is_isomorphic_matching(
-            &exp_result,
-            &result,
-            node_match,
-            edge_match
-        ));
-    }
-
-    /**
-    Tests what happens when you have 3 nodes in a line.
-    */
-    #[test]
-    fn test_clone_graph_three_nodes() {
-        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
-        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
-
-        // node objects
-        let n1: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: -10,
-        };
-        let n2: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let n3: Node = Node {
-            id: NodeId(2),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 10,
-        };
-
-        // instantiate orig_graph and add nodes/edges
-        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let left = orig_graph.add_node(n1.clone());
-        let center = orig_graph.add_node(n2.clone());
-        let right = orig_graph.add_node(n3.clone());
-        orig_graph.add_edge(left, center, 1.0);
-        orig_graph.add_edge(center, left, 1.0);
-        orig_graph.add_edge(center, right, 2.0);
-        orig_graph.add_edge(right, center, 2.0);
-
-        // make exp_result
-        let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
-        let left_clone1 = exp_result.add_node(n1.clone());
-        let left_clone2 = exp_result.add_node(n1.clone());
-        let center_clone1 = exp_result.add_node(n2.clone());
-        let center_clone2 = exp_result.add_node(n2.clone());
-        let right_clone1 = exp_result.add_node(n3.clone());
-        let right_clone2 = exp_result.add_node(n3.clone());
-        exp_result.add_edge(left_clone1, center_clone1, 1.0);
-        exp_result.add_edge(center_clone1, right_clone1, 2.0);
-        exp_result.add_edge(right_clone2, center_clone2, 2.0);
-        exp_result.add_edge(center_clone2, left_clone2, 1.0);
-
-        let result = modify_graph(&orig_graph);
-        assert!(is_isomorphic_matching(
-            &exp_result,
-            &result,
-            node_match,
-            edge_match
-        ));
-    }
-
-    /**
-    Write test for a single fourway intersection
-    */
-    #[test]
-    fn test_clone_graph_fourway_intersection() {
-        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
-        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
-
-        // node objects
-        let center_node: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let west_node: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 1,
-            decimicro_lon: -10,
-        };
-        let north_node: Node = Node {
-            id: NodeId(2),
-            tags: Default::default(),
-            decimicro_lat: 10,
-            decimicro_lon: 1,
-        };
-        let east_node: Node = Node {
-            id: NodeId(3),
-            tags: Default::default(),
-            decimicro_lat: -1,
-            decimicro_lon: 10,
-        };
-        let south_node: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: -10,
-            decimicro_lon: -1,
-        };
-
-        // instantiate orig_graph and add nodes/edges
-        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let center = orig_graph.add_node(center_node.clone());
-        let west = orig_graph.add_node(west_node.clone());
-        let north = orig_graph.add_node(north_node.clone());
-        let east = orig_graph.add_node(east_node.clone());
-        let south = orig_graph.add_node(south_node.clone());
-        orig_graph.add_edge(center, west, 1.0);
-        orig_graph.add_edge(west, center, 1.0);
-        orig_graph.add_edge(center, north, 2.0);
-        orig_graph.add_edge(north, center, 2.0);
-        orig_graph.add_edge(center, east, 3.0);
-        orig_graph.add_edge(east, center, 3.0);
-        orig_graph.add_edge(center, south, 4.0);
-        orig_graph.add_edge(south, center, 4.0);
-
-        // make exp_result
-        let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
-        let west_out = exp_result.add_node(west_node.clone());
-        let west_in = exp_result.add_node(west_node.clone());
-        let north_out = exp_result.add_node(north_node.clone());
-        let north_in = exp_result.add_node(north_node.clone());
-        let east_out = exp_result.add_node(east_node.clone());
-        let east_in = exp_result.add_node(east_node.clone());
-        let south_out = exp_result.add_node(south_node.clone());
-        let south_in = exp_result.add_node(south_node.clone());
-        let clone_to_west = exp_result.add_node(center_node.clone());
-        let clone_to_north = exp_result.add_node(center_node.clone());
-        let clone_to_east = exp_result.add_node(center_node.clone());
-        let clone_to_south = exp_result.add_node(center_node.clone());
-        // add edges leaving intersection
-        exp_result.add_edge(clone_to_west, west_out, 1.0);
-        exp_result.add_edge(clone_to_north, north_out, 2.0);
-        exp_result.add_edge(clone_to_east, east_out, 3.0);
-        exp_result.add_edge(clone_to_south, south_out, 4.0);
-
-        // add edges entering intersection
-        exp_result.add_edge(west_in, clone_to_north, 1.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(west_in, clone_to_east, 1.0); // straight
-        exp_result.add_edge(west_in, clone_to_south, 1.0 + RIGHT_TURN_PENALTY);
-
-        exp_result.add_edge(north_in, clone_to_east, 2.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(north_in, clone_to_south, 2.0); // straight
-        exp_result.add_edge(north_in, clone_to_west, 2.0 + RIGHT_TURN_PENALTY);
-
-        exp_result.add_edge(east_in, clone_to_south, 3.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(east_in, clone_to_west, 3.0); // straight
-        exp_result.add_edge(east_in, clone_to_north, 3.0 + RIGHT_TURN_PENALTY);
-
-        exp_result.add_edge(south_in, clone_to_west, 4.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(south_in, clone_to_north, 4.0); // straight
-        exp_result.add_edge(south_in, clone_to_east, 4.0 + RIGHT_TURN_PENALTY);
-
-        let result = modify_graph(&orig_graph);
-        assert!(is_isomorphic_matching(
-            &exp_result,
-            &result,
-            node_match,
-            edge_match
-        ));
-    }
-
-    #[test]
-    fn test_adjacent_fourways_graph_construction() {
-        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
-        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
-
-        // node objects
-        let center_node1: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let west_node: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 1,
-            decimicro_lon: -10,
-        };
-        let north_node1: Node = Node {
-            id: NodeId(2),
-            tags: Default::default(),
-            decimicro_lat: 10,
-            decimicro_lon: 1,
-        };
-        let south_node1: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: -10,
-            decimicro_lon: -1,
-        };
-        let center_node2: Node = Node {
-            id: NodeId(3),
-            tags: Default::default(),
-            decimicro_lat: -1,
-            decimicro_lon: 10,
-        };
-        let north_node2: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: 10,
-            decimicro_lon: 10,
-        };
-        let east_node: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: 1,
-            decimicro_lon: 20,
-        };
-        let south_node2: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: -10,
-            decimicro_lon: 10,
-        };
-
-        // build original graph
-        let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let c1 = orig_graph.add_node(center_node1.clone());
-        let w = orig_graph.add_node(west_node.clone());
-        let n1 = orig_graph.add_node(north_node1.clone());
-        let s1 = orig_graph.add_node(south_node1.clone());
-        let c2 = orig_graph.add_node(center_node2.clone());
-        let n2 = orig_graph.add_node(north_node2.clone());
-        let e = orig_graph.add_node(east_node.clone());
-        let s2 = orig_graph.add_node(south_node2.clone());
-
-        orig_graph.add_edge(c1, w, 1.0);
-        orig_graph.add_edge(w, c1, 1.0);
-        orig_graph.add_edge(c1, n1, 2.0);
-        orig_graph.add_edge(n1, c1, 2.0);
-        orig_graph.add_edge(c1, s1, 3.0);
-        orig_graph.add_edge(s1, c1, 3.0);
-        orig_graph.add_edge(c1, c2, 4.0);
-        orig_graph.add_edge(c2, c1, 4.0);
-
-        orig_graph.add_edge(c2, n2, 5.0);
-        orig_graph.add_edge(n2, c2, 5.0);
-        orig_graph.add_edge(c2, e, 6.0);
-        orig_graph.add_edge(e, c2, 6.0);
-        orig_graph.add_edge(c2, s2, 7.0);
-        orig_graph.add_edge(s2, c2, 7.0);
-
-        // build exp_result graph
-        let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
-        let c1_w = exp_result.add_node(center_node1.clone());
-        let c1_n = exp_result.add_node(center_node1.clone());
-        let c1_e = exp_result.add_node(center_node1.clone());
-        let c1_s = exp_result.add_node(center_node1.clone());
-
-        let w_1 = exp_result.add_node(west_node.clone());
-        let w_2 = exp_result.add_node(west_node.clone());
-
-        let n1_1 = exp_result.add_node(north_node1.clone());
-        let n1_2 = exp_result.add_node(north_node1.clone());
-
-        let s1_1 = exp_result.add_node(south_node1.clone());
-        let s1_2 = exp_result.add_node(south_node1.clone());
-
-        let c2_w = exp_result.add_node(center_node2.clone());
-        let c2_n = exp_result.add_node(center_node2.clone());
-        let c2_e = exp_result.add_node(center_node2.clone());
-        let c2_s = exp_result.add_node(center_node2.clone());
-
-        let n2_1 = exp_result.add_node(north_node2.clone());
-        let n2_2 = exp_result.add_node(north_node2.clone());
-
-        let e_1 = exp_result.add_node(east_node.clone());
-        let e_2 = exp_result.add_node(east_node.clone());
-
-        let s2_1 = exp_result.add_node(south_node2.clone());
-        let s2_2 = exp_result.add_node(south_node2.clone());
-        // make edges (ugh)
-        // outgoing edges from c1 (but not to c2)
-        exp_result.add_edge(c1_w, w_1, 1.0);
-        exp_result.add_edge(c1_n, n1_1, 2.0);
-        exp_result.add_edge(c1_s, s1_1, 3.0);
-        // add incoming edges to c1 (except from c2)
-        exp_result.add_edge(w_2, c1_n, 1.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(w_2, c1_e, 1.0);
-        exp_result.add_edge(w_2, c1_s, 1.0 + RIGHT_TURN_PENALTY);
-
-        exp_result.add_edge(n1_2, c1_w, 2.0 + RIGHT_TURN_PENALTY);
-        exp_result.add_edge(n1_2, c1_s, 2.0);
-        exp_result.add_edge(n1_2, c1_e, 2.0 + LEFT_TURN_PENALTY);
-
-        exp_result.add_edge(s1_2, c1_w, 3.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(s1_2, c1_n, 3.0);
-        exp_result.add_edge(s1_2, c1_e, 3.0 + RIGHT_TURN_PENALTY);
-        // add edges between c1 and c2
-        exp_result.add_edge(c1_e, c2_n, 4.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(c1_e, c2_e, 4.0);
-        exp_result.add_edge(c1_e, c2_s, 4.0 + RIGHT_TURN_PENALTY);
-
-        exp_result.add_edge(c2_w, c1_s, 4.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(c2_w, c1_w, 4.0);
-        exp_result.add_edge(c2_w, c1_n, 4.0 + RIGHT_TURN_PENALTY);
-
-        // add outgoing edges from c2 (but not to c1)
-        exp_result.add_edge(c2_n, n2_1, 5.0);
-        exp_result.add_edge(c2_e, e_1, 6.0);
-        exp_result.add_edge(c2_s, s2_1, 7.0);
-        // add incoming edges into c2 (but not from c1)
-        exp_result.add_edge(n2_2, c2_w, 5.0 + RIGHT_TURN_PENALTY);
-        exp_result.add_edge(n2_2, c2_s, 5.0);
-        exp_result.add_edge(n2_2, c2_e, 5.0 + LEFT_TURN_PENALTY);
-
-        exp_result.add_edge(e_2, c2_n, 6.0 + RIGHT_TURN_PENALTY);
-        exp_result.add_edge(e_2, c2_w, 6.0);
-        exp_result.add_edge(e_2, c2_s, 6.0 + LEFT_TURN_PENALTY);
-
-        exp_result.add_edge(s2_2, c2_w, 7.0 + LEFT_TURN_PENALTY);
-        exp_result.add_edge(s2_2, c2_n, 7.0);
-        exp_result.add_edge(s2_2, c2_e, 7.0 + RIGHT_TURN_PENALTY);
-
-        // Test!
-        let result = modify_graph(&orig_graph);
-        assert!(is_isomorphic_matching(
-            &exp_result,
-            &result,
-            node_match,
-            edge_match
-        ));
-    }*/
-
-    // NEW TESTS
 
     /**
     Helper for other tests
@@ -2139,8 +1729,11 @@ mod tests {
         orig_graph.add_node(node.clone());
         let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
         exp_result.add_node(node.clone());
-        exp_result.add_node(node.clone());
         let result = modify_graph(&orig_graph);
+        println!("RESULT");
+        print_edges(&result);
+        println!("EXP RESULT");
+        print_edges(&exp_result);
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -2177,6 +1770,10 @@ mod tests {
         let orig_graph = simple_fourway();
         let exp_result = clones_fourway();
         let result = modify_graph(&orig_graph);
+        println!("EXP RESULT");
+        print_edges(&exp_result);
+        println!("RESULT");
+        print_edges(&result);
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -2187,9 +1784,10 @@ mod tests {
 
 
     /**
-    It will be very annoying to make this a real test since I can't guarantee the node indices are stable in the graph and I'd have to do a lot of acrobatics to make it always work, so just run the code and make sure the assert! at the end is set to false and it will print results to console to manually check.
+    It would be annoying to make this a real test using assertions since I can't guarantee the node indices are stable in the graph and I'd have to do some acrobatics to make it always work, so just run the code and make sure the assert! at the end is set to false and it will print results to console to manually check.
     */
     #[test]
+    #[ignore]
     fn manual_test_min_dist() {
         let modified_graph = clones_fourway();
         let min_dist = djikstra_float(&modified_graph,NodeIndex::new(1));
@@ -2205,6 +1803,9 @@ mod tests {
         assert!(true);
     }
 
+    /**
+    Useful for printing a graph to the console for manually checking the structure of a graph.
+    */
     fn print_edges(g: &Graph<Node, f32, Directed>) {
         println!("GRAPH EDGES ({} nodes, {} edges)", g.node_count(), g.edge_count());
         for edge in g.edge_indices() {
@@ -2372,17 +1973,63 @@ mod tests {
     }
 
     #[test]
-    fn test_two_nodes_each_step() {
+    fn test_two_nodes_before_add_internal_edges() {
+        // test identify_intersection_type
         let test_graph = simple_two_nodes();
-        let clone_data_result = identify_intersection_type(&test_graph);
-        // build exp result
-        let clone_list_0 = CloneList::new(IntersectionType::DeadEnd);
+        let mut clone_data_result = identify_intersection_type(&test_graph);
+        // build exp result for identify_intersecton_type
+        let mut clone_list_0 = CloneList::new(IntersectionType::DeadEnd);
         let node_ix_0 = NodeIndex::new(0);
-        let clone_list_1 = CloneList::new(IntersectionType::DeadEnd);
+        let mut clone_list_1 = CloneList::new(IntersectionType::DeadEnd);
         let node_ix_1 = NodeIndex::new(1);
         let mut clone_data_exp_result = HashMap::new();
         clone_data_exp_result.insert(node_ix_0,clone_list_0);
         clone_data_exp_result.insert(node_ix_1,clone_list_1);
         assert_eq!(clone_data_result, clone_data_exp_result);
+
+        let new_graph = add_edges_external_to_intersection(&test_graph, &mut clone_data_result);
+        assert_eq!(2,clone_data_result.get(&node_ix_0).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(2,clone_data_result.get(&node_ix_1).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let exp_new_graph = clones_two_nodes();
+        assert!(is_isomorphic_matching(&new_graph, &exp_new_graph, node_match, edge_match));
+    }
+
+    #[test]
+    fn test_fourway_before_add_internal_edges() {
+        // test identify_intersection_type
+        let test_graph = simple_fourway();
+        let mut clone_data_result = identify_intersection_type(&test_graph);
+        // build exp result for identify_intersecton_type
+        let mut clone_list_0 = CloneList::new(IntersectionType::DeadEnd);
+        let node_ix_0 = NodeIndex::new(0);
+        let mut clone_list_1 = CloneList::new(IntersectionType::DeadEnd);
+        let node_ix_1 = NodeIndex::new(1);
+        let mut clone_list_2 = CloneList::new(IntersectionType::DeadEnd);
+        let node_ix_2 = NodeIndex::new(2);
+        let mut clone_list_3 = CloneList::new(IntersectionType::DeadEnd);
+        let node_ix_3 = NodeIndex::new(3);
+        let mut clone_list_4 = CloneList::new(IntersectionType::FourWay);
+        let node_ix_4 = NodeIndex::new(4);
+        let mut clone_data_exp_result = HashMap::new();
+        clone_data_exp_result.insert(node_ix_0,clone_list_0);
+        clone_data_exp_result.insert(node_ix_1,clone_list_1);
+        clone_data_exp_result.insert(node_ix_2,clone_list_2);
+        clone_data_exp_result.insert(node_ix_3,clone_list_3);
+        clone_data_exp_result.insert(node_ix_4,clone_list_4);
+        assert_eq!(clone_data_result, clone_data_exp_result);
+
+        let mut new_graph = add_edges_external_to_intersection(&test_graph, &mut clone_data_result);
+        assert_eq!(2,clone_data_result.get(&node_ix_0).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(2,clone_data_result.get(&node_ix_1).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(2,clone_data_result.get(&node_ix_2).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(2,clone_data_result.get(&node_ix_3).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(8,clone_data_result.get(&node_ix_4).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        // below are also not perfect but i'm lazy to recreate graph and it looks correct on console when i print edges
+        assert_eq!(16, new_graph.node_count());
+        assert_eq!(8, new_graph.edge_count());
     }
 }
