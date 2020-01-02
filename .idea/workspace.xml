@@ -22,8 +22,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4011">
-              <caret line="625" column="95" selection-start-line="625" selection-start-column="95" selection-end-line="625" selection-end-column="95" />
+            <state relative-caret-position="706">
+              <caret line="245" column="5" selection-start-line="245" selection-start-column="5" selection-end-line="245" selection-end-column="5" />
               <folding>
                 <element signature="e#3430#3431#0" expanded="true" />
                 <element signature="e#3462#3463#0" expanded="true" />
@@ -445,12 +445,18 @@
       <option name="project" value="LOCAL" />
       <updated>1577126966275</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="Everything now works (including drawing to the screen)! It currrently only deals with fourway intersections and other forms of intersections are ignored, but everything is together. About to do some refactoring to simplify everything.">
+      <created>1578009150373</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1578009150374</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="16" y="23" width="1322" height="609" extended-state="0" />
-    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.31298906" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -552,7 +558,8 @@
     <MESSAGE value="About to totally redo the turns project, making the modified graph be based on the ideas of lanes (two lanes for a road), as this will hopefully be much more conceptually simple and easier to reason about, although it will make even more complicated test cases." />
     <MESSAGE value="The new method (of using lanes) is now mostly implemented. Simple graphs now work correctly, but fourways and T-Intersections do not. I'm about to delete all the old test cases for the prior method (but were commented out)." />
     <MESSAGE value="All tests now work (including fourway clone graph), but I haven't tested yet with other components (min distance, etc.). About to delete some unused methods/testcases (sort_clone_list)" />
-    <option name="LAST_COMMIT_MESSAGE" value="All tests now work (including fourway clone graph), but I haven't tested yet with other components (min distance, etc.). About to delete some unused methods/testcases (sort_clone_list)" />
+    <MESSAGE value="Everything now works (including drawing to the screen)! It currrently only deals with fourway intersections and other forms of intersections are ignored, but everything is together. About to do some refactoring to simplify everything." />
+    <option name="LAST_COMMIT_MESSAGE" value="Everything now works (including drawing to the screen)! It currrently only deals with fourway intersections and other forms of intersections are ignored, but everything is together. About to do some refactoring to simplify everything." />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
@@ -943,8 +950,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4011">
-          <caret line="625" column="95" selection-start-line="625" selection-start-column="95" selection-end-line="625" selection-end-column="95" />
+        <state relative-caret-position="706">
+          <caret line="245" column="5" selection-start-line="245" selection-start-column="5" selection-end-line="245" selection-end-column="5" />
           <folding>
             <element signature="e#3430#3431#0" expanded="true" />
             <element signature="e#3462#3463#0" expanded="true" />
