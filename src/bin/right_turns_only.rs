@@ -1,24 +1,24 @@
+use crate::tests::clones_fourway;
+use crate::tests::print_edges;
+use crate::tests::print_edges_undirected;
+use crate::tests::simple_fourway;
 use nannou::draw::properties::Vertices;
 use nannou::prelude::*;
 use ordered_float::OrderedFloat;
 use osmpbfreader::{Node, NodeId, Way};
+use petgraph::algo::is_isomorphic;
 use petgraph::algo::is_isomorphic_matching;
 use petgraph::graph::NodeIndex;
 use petgraph::graph::*;
 use petgraph::prelude::*;
-use petgraph::visit::{IntoEdges, IntoNeighbors, IntoEdgesDirected};
+use petgraph::visit::{IntoEdges, IntoEdgesDirected, IntoNeighbors};
 use rand::Rng;
 use std::cmp::Ordering;
+use std::cmp::Ordering::Greater;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::cmp::Ordering::Greater;
-
-const UTURN_PENALTY: f32 = 8.0;
-const LEFT_TURN_PENALTY: f32 = 5.0;
-const RIGHT_TURN_PENALTY: f32 = 1.0;
-const STRAIGHT_PENALTY: f32 = 0.0;
 
 // AROUND MY HOUSE
 /*
@@ -82,12 +82,8 @@ const MIN_LON: f64 = -71.3820;
 const MAX_LAT: f64 = 41.5028;
 const MIN_LAT: f64 = 41.4938;*/
 
-const MAX_LON: f64 = 30.0;
-const MIN_LON: f64 = -30.0;
-const MAX_LAT: f64 = 30.0;
-const MIN_LAT: f64 = -30.0;
-
 // VERY small part of Jamestown, RI
+// (osm node id at intersection of Canonicus Ave and Park Avenue: 201128095
 /*
 const MAX_LON: f64 = -71.36557;
 const MIN_LON: f64 = -71.37553;
@@ -114,6 +110,17 @@ const MIN_LON: f64 = -71.40392;
 const MAX_LAT: f64 = 41.82546;
 const MIN_LAT: f64 = 41.82323;*/
 
+// South of Brown University
+// (corner of Gano and Wickenden: 201383067)
+const MAX_LON: f64 = -71.3748;
+const MIN_LON: f64 = -71.4125;
+const MAX_LAT: f64 = 41.8308;
+const MIN_LAT: f64 = 41.8148;
+
+const LEFT_TURN_PENALTY: f32 = 10000.0;
+const RIGHT_TURN_PENALTY: f32 = 0.0;
+const STRAIGHT_PENALTY: f32 = 0.0;
+
 const LON_RANGE: f64 = MAX_LON - MIN_LON;
 const LAT_RANGE: f64 = MAX_LAT - MIN_LAT;
 
@@ -135,6 +142,9 @@ struct Model {
     road_lines: Vec<Line>, // Line stores start, end, hue, saturation, alpha, thickness
 }
 
+/**
+Builds the model (the data to display for nannou)
+*/
 fn model(app: &App) -> Model {
     let _window = app
         .new_window()
@@ -144,104 +154,97 @@ fn model(app: &App) -> Model {
         .build()
         .unwrap();
 
-    let mut start_node = NodeIndex::new(0);
-    /*
-        let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-                                                                                         //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+    let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
+                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+    let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
+    let mut pbf = osmpbfreader::OsmPbfReader::new(r);
 
-        let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
-        let mut pbf = osmpbfreader::OsmPbfReader::new(r);
+    let mut nodes = HashMap::new();
+    let mut all_roads: Vec<Way> = Vec::new();
 
-        let mut nodes = HashMap::new();
-        let mut all_roads: Vec<Way> = Vec::new();
-
-        // READING MAP DATA
-        for obj in pbf.par_iter().map(Result::unwrap) {
-            match obj {
-                osmpbfreader::OsmObj::Node(node) => {
-                    if is_in_outer_bounds(&node) {
-                        nodes.insert(node.id, node);
-                    }
+    // READING MAP DATA
+    for obj in pbf.par_iter().map(Result::unwrap) {
+        match obj {
+            osmpbfreader::OsmObj::Node(node) => {
+                if is_in_outer_bounds(&node) {
+                    nodes.insert(node.id, node);
                 }
-                osmpbfreader::OsmObj::Way(way) => {
-                    if way.tags.contains_key("highway") {
-                        all_roads.push(way);
-                    }
-                }
-                osmpbfreader::OsmObj::Relation(_rel) => {}
             }
+            osmpbfreader::OsmObj::Way(way) => {
+                if way.tags.contains_key("highway") {
+                    all_roads.push(way);
+                }
+            }
+            osmpbfreader::OsmObj::Relation(_rel) => {}
         }
+    }
 
-        // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
-        // roads thus represents all the Ways that have at least one node in the map bounds
-        let mut roads: Vec<Way> = Vec::new();
-        for road in all_roads {
-            let any_in_bounds = road.nodes.iter().any(|node_id| {
-                if nodes.contains_key(node_id) {
-                    let node = nodes.get(node_id).unwrap();
-                    is_in_bounds(node)
+    // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
+    // roads thus represents all the Ways that have at least one node in the map bounds
+    let mut roads: Vec<Way> = Vec::new();
+    for road in all_roads {
+        let any_in_bounds = road.nodes.iter().any(|node_id| {
+            if nodes.contains_key(node_id) {
+                let node = nodes.get(node_id).unwrap();
+                is_in_bounds(node)
+            } else {
+                false
+            }
+        });
+
+        // if any of the nodes in the road are in bounds, then keep the road for the graph
+        if any_in_bounds {
+            roads.push(road);
+        }
+    }
+
+    // BUILD GRAPH
+    // make hashmap of node ids to node indices
+    // before adding a node, check to see if it exists
+    // when you add an edge, use node index from hashmap
+    let mut graph_node_indices = HashMap::new();
+    let mut road_graph = Graph::<Node, f32, Directed>::new();
+    for road in &roads {
+        let mut prior_node_index = NodeIndex::new(0);
+        for (i, node_id) in road.nodes.iter().enumerate() {
+            // look up node using id
+            if let Some(node) = nodes.get(node_id) {
+                let cur_node_index: NodeIndex;
+                if graph_node_indices.contains_key(node) {
+                    cur_node_index = *graph_node_indices.get(node).unwrap();
                 } else {
-                    false
+                    cur_node_index = road_graph.add_node(node.clone());
+                    graph_node_indices.insert(node, cur_node_index);
                 }
-            });
 
-            // if any of the nodes in the road are in bounds, then keep the road for the graph
-            if any_in_bounds {
-                roads.push(road);
+                // if it's not the first one, form an edge along the path
+                if i != 0 {
+                    // find distances between the two points
+                    let prior_node = road_graph
+                        .node_weight(prior_node_index)
+                        .expect("prior node should exist because we already traversed it");
+                    let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
+                    let end_point = pt2(node.lon() as f32, node.lat() as f32);
+
+                    // for any of those nodes, print the edge that is being added, so i can be sure it's adding those edges and no more
+                    // for each node then, I should see two edges and those edge should be to the correct other points
+
+                    road_graph.add_edge(
+                        prior_node_index,
+                        cur_node_index,
+                        dist(start_point, end_point),
+                    );
+                    road_graph.add_edge(
+                        cur_node_index,
+                        prior_node_index,
+                        dist(start_point, end_point),
+                    );
+                }
+                prior_node_index = cur_node_index;
             }
         }
-
-        // BUILD GRAPH
-        // make hashmap of node ids to node indices
-        // before adding a node, check to see if it exists
-        // when you add an edge, use node index from hashmap
-        let mut graph_node_indices = HashMap::new();
-        let mut road_graph = Graph::<Node, f32, Directed>::new();
-        for road in &roads {
-            let mut prior_node_index = NodeIndex::new(0);
-            for (i, node_id) in road.nodes.iter().enumerate() {
-                // look up node using id
-                if let Some(node) = nodes.get(node_id) {
-                    let cur_node_index: NodeIndex;
-                    if graph_node_indices.contains_key(node) {
-                        cur_node_index = *graph_node_indices.get(node).unwrap();
-                    } else {
-                        cur_node_index = road_graph.add_node(node.clone());
-                        if (node.id.0 == 5955756766) {
-                            println!("Found node 5955756766");
-                            start_node = cur_node_index;
-                        }
-                        graph_node_indices.insert(node, cur_node_index);
-                    }
-
-                    // if it's not the first one, form an edge along the path
-                    if i != 0 {
-                        // find distances between the two points
-                        let prior_node = road_graph
-                            .node_weight(prior_node_index)
-                            .expect("prior node should exist because we already traversed it");
-                        let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
-                        let end_point = pt2(node.lon() as f32, node.lat() as f32);
-
-                        // for any of those nodes, print the edge that is being added, so i can be sure it's adding those edges and no more
-                        // for each node then, I should see two edges and those edge should be to the correct other points
-
-                        road_graph.add_edge(
-                            prior_node_index,
-                            cur_node_index,
-                            dist(start_point, end_point),
-                        );
-                        road_graph.add_edge(
-                            cur_node_index,
-                            prior_node_index,
-                            dist(start_point, end_point),
-                        );
-                    }
-                    prior_node_index = cur_node_index;
-                }
-            }
-        }
-    */
+    }
+    /*
     let node0: Node = Node {
         id: NodeId(0),
         tags: Default::default(),
@@ -251,26 +254,26 @@ fn model(app: &App) -> Model {
     let node1: Node = Node {
         id: NodeId(1),
         tags: Default::default(),
-        decimicro_lat: -10,
-        decimicro_lon: 1,
+        decimicro_lat: 1,
+        decimicro_lon: -10,
     };
     let node2: Node = Node {
         id: NodeId(2),
         tags: Default::default(),
-        decimicro_lat: 1,
-        decimicro_lon: 10,
+        decimicro_lat: 10,
+        decimicro_lon: 0,
     };
     let node3: Node = Node {
         id: NodeId(3),
         tags: Default::default(),
-        decimicro_lat: 10,
-        decimicro_lon: -1,
+        decimicro_lat: -1,
+        decimicro_lon: 10,
     };
     let node4: Node = Node {
         id: NodeId(4),
         tags: Default::default(),
-        decimicro_lat: -1,
-        decimicro_lon: -10,
+        decimicro_lat: -10,
+        decimicro_lon: -1,
     };
     let node5: Node = Node {
         id: NodeId(5),
@@ -281,32 +284,32 @@ fn model(app: &App) -> Model {
     let node6: Node = Node {
         id: NodeId(6),
         tags: Default::default(),
-        decimicro_lat: 20,
-        decimicro_lon: -1,
+        decimicro_lat: -1,
+        decimicro_lon: 20,
     };
     let node7: Node = Node {
         id: NodeId(7),
         tags: Default::default(),
-        decimicro_lat: 10,
-        decimicro_lon: -10,
+        decimicro_lat: -10,
+        decimicro_lon: 10,
     };
     let node8: Node = Node {
         id: NodeId(8),
         tags: Default::default(),
-        decimicro_lat: 0,
-        decimicro_lon: -10,
+        decimicro_lat: -10,
+        decimicro_lon: 20,
     };
     let node9: Node = Node {
         id: NodeId(9),
         tags: Default::default(),
-        decimicro_lat: 10,
-        decimicro_lon: -20,
+        decimicro_lat: -20,
+        decimicro_lon: 10,
     };
     let node10: Node = Node {
         id: NodeId(10),
         tags: Default::default(),
-        decimicro_lat: 20,
-        decimicro_lon: -10,
+        decimicro_lat: -10,
+        decimicro_lon: 0,
     };
     let mut road_graph = Graph::<Node, f32, Directed>::new();
 
@@ -315,6 +318,7 @@ fn model(app: &App) -> Model {
     let n2 = road_graph.add_node(node2);
     let n3 = road_graph.add_node(node3);
     let n4 = road_graph.add_node(node4);
+
     let n5 = road_graph.add_node(node5);
     let n6 = road_graph.add_node(node6);
     let n7 = road_graph.add_node(node7);
@@ -323,73 +327,47 @@ fn model(app: &App) -> Model {
     // let n10 = road_graph.add_node(node10);
     road_graph.add_edge(n0, n1, 1.0); // the edge weights don't actually matter here as we're only testing the structure of the graph
     road_graph.add_edge(n1, n0, 1.0);
-    road_graph.add_edge(n0, n2, 1.0);
-    road_graph.add_edge(n2, n0, 1.0);
-    road_graph.add_edge(n0, n3, 1.0);
-    road_graph.add_edge(n3, n0, 1.0);
-    road_graph.add_edge(n0, n4, 1.0);
-    road_graph.add_edge(n4, n0, 1.0);
-    road_graph.add_edge(n3, n5, 1.0);
-    road_graph.add_edge(n5, n3, 1.0);
-    road_graph.add_edge(n3, n6, 1.0);
-    road_graph.add_edge(n6, n3, 1.0);
-    road_graph.add_edge(n3, n7, 1.0);
-    road_graph.add_edge(n7, n3, 1.0);
+    road_graph.add_edge(n0, n2, 2.0);
+    road_graph.add_edge(n2, n0, 2.0);
+    road_graph.add_edge(n0, n3, 3.0);
+    road_graph.add_edge(n3, n0, 3.0);
+    road_graph.add_edge(n0, n4, 4.0);
+    road_graph.add_edge(n4, n0, 4.0);
+    road_graph.add_edge(n3, n5, 5.0);
+    road_graph.add_edge(n5, n3, 5.0);
+    road_graph.add_edge(n3, n6, 6.0);
+    road_graph.add_edge(n6, n3, 6.0);
+    road_graph.add_edge(n3, n7, 7.0);
+    road_graph.add_edge(n7, n3, 7.0);
     /* road_graph.add_edge(n7, n8, 1.0);
     road_graph.add_edge(n8, n7, 1.0);
     road_graph.add_edge(n7, n9, 1.0);
     road_graph.add_edge(n9, n7, 1.0);
     road_graph.add_edge(n7, n10, 1.0);
     road_graph.add_edge(n10, n7, 1.0);*/
-    for edge in road_graph.edge_indices() {
-        let (start, end) = road_graph.edge_endpoints(edge).unwrap();
-        let start_weight = road_graph.node_weight(start).unwrap();
-        let end_weight = road_graph.node_weight(end).unwrap();
-        println!(
-            "({},{} -> {},{})",
-            start_weight.id.0,
-            start.index(),
-            end_weight.id.0,
-            end.index()
-        );
-        // println!("({},{})",start_weight.id.0, end_weight.id.0);
-    }
+    */
 
     let modified_graph = modify_graph(&road_graph);
 
-    // find the minimum distance to every node in the graphs (both the original and the turn-modified graph)
-    let orig_min_dist_to_nodes = djikstra_float(&road_graph, start_node);
-    // find the index of the start node in the turn-modified graph, then find the minimum distance to very node in that turn-modified graph
-    let start_osm_id = road_graph.node_weight(start_node).unwrap();
-    let start_node = modified_graph
-        .node_indices()
-        .find(|&node_ix| start_osm_id == modified_graph.node_weight(node_ix).unwrap())
-        .expect("modified_graph should have a node with that osm id.");
-    let modified_min_dist_to_nodes = djikstra_float(&modified_graph, start_node);
-    for (node_ix, min_dist) in modified_min_dist_to_nodes.iter() {
-        let id = modified_graph.node_weight(*node_ix).unwrap().id.0;
-        if min_dist.is_none() {
-            println!("id: {}, ix: {}, min_dist: NONE", id, node_ix.index());
-        } else {
-            println!(
-                "id: {}, ix: {}, min_dist: {}",
-                id,
-                node_ix.index(),
-                min_dist.unwrap()
-            );
-        }
-    }
+    let start_osm_id = 201383067;
+    // find min dist from starting point to ever
+    let orig_start_node_ix = node_ix_with_osm_id(start_osm_id, &road_graph).unwrap();
+
+    let orig_min_dist_to_nodes = djikstra_float(&road_graph, orig_start_node_ix);
+
+    let modified_start_node_ix = node_ix_with_osm_id(start_osm_id, &modified_graph).unwrap();
+    let modified_min_dist_to_nodes = djikstra_float(&modified_graph, modified_start_node_ix);
 
     // now make graphs where the edges themselves represent the min distances. (it takes the min distance to each endpoint and averages them--graph with clones it takes whichever clone endpoints have the smallest average)
-    let orig_min_dist = simplify_to_undirected(&road_graph, &orig_min_dist_to_nodes);
-    let modified_min_dist = simplify_to_undirected(&modified_graph, &modified_min_dist_to_nodes);
-
+    let orig_min_dist = simplify_graph(&road_graph, &orig_min_dist_to_nodes);
+    let modified_min_dist = simplify_graph(&modified_graph, &modified_min_dist_to_nodes);
     // subtract difference between original and modified graphs
     let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
 
+    print_edges_undirected(&difference_graph);
+
     // convert into Lines for easy nannou drawing
     let road_lines = make_lines_for_nannou(&difference_graph);
-
     Model {
         _window,
         road_lines,
@@ -475,13 +453,15 @@ This takes the complicated graph (which might have multiple clones for a given l
 
 Note that the turn-limited graph has multiple "clone" nodes for each location. Because more than one node represents a single individual location, for the weight of the final edge in the return graph, this function chooses whichever edge has endpoints with the miniumum min-distance. Because these various clones represent different possible ways of reaching their location, any of them is a valid point to reach, and so the return graph from this function should accurately show the MINIMUM distance to that road segment.
 */
-fn simplify_to_undirected(
+fn simplify_graph(
     g: &Graph<Node, f32, Directed>,
     min_dist: &HashMap<NodeIndex, Option<f32>, RandomState>,
-) -> Graph<Node, f32, Undirected> {
-    let mut ret_graph = Graph::<Node, f32, Undirected>::new_undirected();
+) -> Graph<Node, Option<f32>, Undirected> {
+    let mut ret_graph = Graph::<Node, Option<f32>, Undirected>::new_undirected();
     // group the nodes by their geographical location (at intersections multiple clones correspond to only one point in the map)
     let unique_locations = group_by_orig_location(g);
+    // there is a many to one correspondance between nodes in g and ret_graph (because we are consolidating all clones for a given location into one node)
+    // so as you create these nodes, create a hashmap to help lookup the original node with its equivalent in ret_graph
     let mut g_to_ret_graph: HashMap<NodeIndex, NodeIndex> = HashMap::new();
     for (location, clones) in unique_locations {
         let new_node_ix = ret_graph.add_node(location.clone());
@@ -495,28 +475,37 @@ fn simplify_to_undirected(
         let (start_g, end_g) = g.edge_endpoints(edge).unwrap();
         let start_ret = *g_to_ret_graph.get(&start_g).unwrap();
         let end_ret = *g_to_ret_graph.get(&end_g).unwrap();
-        // check to see if an edge already exists. If not, make a new one with maximum f32 value
-        let mut ret_graph_edge = ret_graph.find_edge(start_ret, end_ret);
-        if ret_graph_edge.is_none() {
-            ret_graph_edge = Some(ret_graph.add_edge(start_ret, end_ret, std::f32::MAX));
-        }
-        let ret_graph_edge = ret_graph_edge.unwrap();
+        // we want to ignore edges between clones. djikstra_float() already used this information to make min_dist
+        if start_ret != end_ret {
+            // check to see if an edge already exists. If not, make a new one with maximum f32 value
+            let ret_graph_edge = ret_graph
+                .find_edge(start_ret, end_ret)
+                .unwrap_or_else(|| ret_graph.add_edge(start_ret, end_ret, None));
 
-        // compare the edge weight in g with the edge weight in ret_graph, then use the new edge weight if it's lower.
-        let min_dist_to_start = min_dist.get(&start_g).unwrap(); // minimum distance to start node
-        let min_dist_to_end = min_dist.get(&end_g).unwrap();
-        // if the graph is disconnected, then some nodes might have None value, meaning they're unreachable (so ignore them)
-        if min_dist_to_start.is_some() && min_dist_to_end.is_some() {
-            let mut weight = (min_dist_to_start.unwrap() + min_dist_to_end.unwrap()) / 2.0;
-            let mut cur_weight: &mut f32 = ret_graph.edge_weight_mut(ret_graph_edge).unwrap();
-            *cur_weight = if OrderedFloat(*cur_weight)
-                .cmp(&OrderedFloat(weight))
-                .eq(&Ordering::Less)
-            {
-                *cur_weight
-            } else {
-                weight
-            };
+            let min_dist_to_start = min_dist.get(&start_g).unwrap();
+            let min_dist_to_end = min_dist.get(&end_g).unwrap();
+
+            // compare the edge weight in g with the edge weight in ret_graph, then use the new edge weight if it's lower.
+            // if the graph is disconnected, then some nodes might have None value, meaning they're unreachable (so ignore them)
+            if min_dist_to_start.is_some() && min_dist_to_end.is_some() {
+                let mut weight = (min_dist_to_start.unwrap() + min_dist_to_end.unwrap()) / 2.0;
+                let cur_weight: &mut Option<f32> =
+                    ret_graph.edge_weight_mut(ret_graph_edge).unwrap();
+                if cur_weight.is_none() {
+                    *cur_weight = Some(weight);
+                } else {
+                    *cur_weight = Some(
+                        if OrderedFloat(cur_weight.unwrap())
+                            .cmp(&OrderedFloat(weight))
+                            .eq(&Ordering::Less)
+                        {
+                            cur_weight.unwrap()
+                        } else {
+                            weight
+                        },
+                    );
+                }
+            }
         }
     }
     ret_graph
@@ -533,7 +522,7 @@ fn group_by_orig_location(
     let mut unique_locations: HashMap<&Node, Vec<NodeIndex>, RandomState> = HashMap::new();
     for node_ix in g.node_indices() {
         let osm_node = g.node_weight(node_ix).unwrap();
-        let node_list = unique_locations.entry(osm_node).or_insert(Vec::new());
+        let node_list = unique_locations.entry(osm_node).or_insert_with(Vec::new);
         node_list.push(node_ix);
     }
     unique_locations
@@ -545,10 +534,12 @@ This takes two IDENTICALLY STRUCTURED graphs and returns another identically str
 This can show the difference between two pathfinding algorithms for the same road graph (e.g. where one limited certain kinds of turns). The two graphs MUST be identical, except for their edge weights. More specifically, the number of nodes and edges must be the same, the way those edges/nodes are connected must be the same, and the weights of all nodes must be the same. If this isn't true, this function will probably panic or do something weird.
 */
 fn edge_difference(
-    g1: &Graph<Node, f32, Undirected>,
-    g2: &Graph<Node, f32, Undirected>,
-) -> Graph<Node, f32, Undirected> {
-    // TODO: use the petgraph algorithm to check for graph isomorphism first (?)
+    g1: &Graph<Node, Option<f32>, Undirected>,
+    g2: &Graph<Node, Option<f32>, Undirected>,
+) -> Graph<Node, Option<f32>, Undirected> {
+    // for testing small graphs, can assert isomorphism here, but on real data (with thousands of nodes), this is far too inefficient to run practically
+    // assert!(is_isomorphic(g1, g2));
+
     // build a hashmap associating the OpenStreetMap node id with node indices from the petgraph graph (the OSM id is the actual values stored in the petgraph graph nodes)
     let g1_nodes: HashMap<i64, NodeIndex> = g1
         .node_indices()
@@ -570,7 +561,7 @@ fn edge_difference(
 
     // now we build our new graph's nodes, making the clones of the ids in g1
     // we also at the same time build a hashmap associating the g1 nodes with these new graph nodes
-    let mut ret_graph = Graph::<Node, f32, Undirected>::new_undirected();
+    let mut ret_graph = Graph::<Node, Option<f32>, Undirected>::new_undirected();
     let mut g1_to_ret = HashMap::new();
     for g1_node_ix in g1.node_indices() {
         let new_node_ix = ret_graph.add_node(g1.node_weight(g1_node_ix).unwrap().clone());
@@ -594,17 +585,57 @@ fn edge_difference(
             .edge_weight(g2.find_edge(g2_start, g2_end).unwrap())
             .unwrap();
         // make new edge with weight being difference between the edge weights of the g1 and g2 graphs
-        ret_graph.add_edge(ret_start, ret_end, g1_weight - g2_weight);
+        let edge_weight_diff = if g1_weight.is_none() || g2_weight.is_none() {
+            None
+        } else {
+            Some(g1_weight.unwrap() - g2_weight.unwrap())
+        };
+        ret_graph.add_edge(ret_start, ret_end, edge_weight_diff);
     }
     ret_graph
 }
 
-fn make_lines_for_nannou(g: &Graph<Node, f32, Undirected>) -> Vec<Line> {
-    let test_vec: Vec<()> = g
+fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> {
+    let mut road_lines: Vec<Line> = Vec::new();
+    let max_weight = g
         .edge_indices()
-        .map(|e_ix| println!("edge_weight: {}", g.edge_weight(e_ix).unwrap()))
-        .collect();
-    Vec::new()
+        .map(|edge_ix| g.edge_weight(edge_ix).unwrap())
+        .filter(|e_weight| e_weight.is_some())
+        .map(|weight| (weight.unwrap() * 10000.) as u32) // avoids using float, we know range of longitude/latitude coordinates isn't more than 180.0 (?)
+        .max()
+        .unwrap();
+
+    let num_hue_cycles = 2; // number of times the hue range cycles through before reaching the farthest point.
+    let sat_cycles = 10; // number of times saturation cycles through before reaching the farthest point
+    let mut road_lines: Vec<Line> = Vec::new();
+    for edge in g.raw_edges() {
+        let source = convert_coord(g.node_weight(edge.source()).unwrap());
+        let target = convert_coord(g.node_weight(edge.target()).unwrap());
+        // FIND WEIGHT AS INT
+        let weight = (edge.weight.unwrap_or(0.0) * 10000.0) as u32; // make an integer so you can use % operator
+                                                                    // TRANSFORM WEIGHT INTO HUE (0.0-1.0)
+        let hue = if weight != 0 {map_range(weight, 0, max_weight, HUE_MIN, HUE_MAX)} else {0.0};
+        // TRANSFORM INTO SATURATION (0.0-1.0)
+        let saturation =  map_range(weight, 0, max_weight /*/ sat_cycles+1*/, 0.5, 1.0);
+        let thickness = 3.0;
+        let alpha = 1.0;
+
+        road_lines.push(Line {
+            start: source,
+            end: target,
+            thickness,
+            hue,
+            saturation,
+            alpha,
+        });
+    }
+    // TESTING
+    println!("LINES LINES LINES");
+    for line in road_lines.iter() {
+        println!("s: {:?}, t: {:?}, hue: {}", line.start, line.end, line.hue);
+    }
+    // END TESTING
+    road_lines
 }
 
 fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) -> Vec<Line> {
@@ -715,7 +746,6 @@ fn djikstra_float(
         // set starting point to zero
         min_dist.insert(start, 0.0);
         // if it's a modified graph, multiple clones represent one location (osm_id), so all the nodes for the starting location need to have minimum distance of zero.
-
         let start_indices: Vec<NodeIndex> = g
             .node_indices()
             .filter(|&node_ix| *g.node_weight(start).unwrap() == *g.node_weight(node_ix).unwrap())
@@ -742,14 +772,17 @@ fn djikstra_float(
                        // println!("({},{})",start_weight.id.0, end_weight.id.0);
                     }
         */
-        // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from start
-        let edges_from_start = g.edges_directed(start, Outgoing);
+        // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from all start nodes
+        /* let edges_leaving_start: Vec<EdgeReference<f32,u32>> = start_indices.iter()
+        .flat_map(|&start_ix| g.edges_directed(start_ix,Outgoing))
+        .collect();*/
+        /*let edges_from_start = g.edges_directed(start, Outgoing);
         edge_dist = edges_from_start
             .map(|edge| DistFloat {
                 node: edge.target(),
                 dist: OrderedFloat(*edge.weight()),
             })
-            .collect();
+            .collect();*/
 
         // traverse graph, adding one node at a time (choose the one with the lowest accumulated path distance)
         while !edge_dist.is_empty() {
@@ -790,28 +823,24 @@ fn djikstra_float(
 }
 
 fn modify_graph(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
-    // one pass: identify intersections
-    // second pass: add clones via adding edges:
-        // add clone and add it to th elist in the CloneList
-        // add edge while you do it
-    // third pass: add edges for each
-        // add internal edges
     let mut clone_lists = identify_intersection_type(&g);
     let mut new_g = add_edges_external_to_intersection(&g, &mut clone_lists);
     add_internal_interesection_edges(&g, &mut new_g, clone_lists);
     new_g
 }
 
-fn identify_intersection_type(g: &Graph<Node, f32, Directed>) -> HashMap<NodeIndex, CloneList,RandomState> {
+fn identify_intersection_type(
+    g: &Graph<Node, f32, Directed>,
+) -> HashMap<NodeIndex, CloneList, RandomState> {
     g.node_indices()
-        .fold(HashMap::new(), |mut clone_lists,node_ix| {
+        .fold(HashMap::new(), |mut clone_lists, node_ix| {
             let intersection_type = match g.neighbors(node_ix).count() {
                 0 => IntersectionType::Isolate,
                 1 => IntersectionType::DeadEnd,
                 2 => IntersectionType::MiddleOfRoad,
                 3 => IntersectionType::TIntersection,
                 4 => IntersectionType::FourWay,
-                _ => IntersectionType::Other
+                _ => IntersectionType::Other,
             };
             clone_lists.insert(node_ix, CloneList::new(intersection_type));
             clone_lists
@@ -823,12 +852,12 @@ Creates a new graph (new_g). For each edge in g, it takes the endpoints and make
 */
 fn add_edges_external_to_intersection(
     g: &Graph<Node, f32, Directed>,
-    clone_data: &mut HashMap<NodeIndex, CloneList>
+    clone_data: &mut HashMap<NodeIndex, CloneList>,
 ) -> Graph<Node, f32, Directed> {
     let mut new_g: Graph<Node, f32, Directed> = Graph::new();
     for edge in g.edge_indices() {
         // get all necessary info from the edge in the original graph
-        let (source_ix,target_ix) = g.edge_endpoints(edge).unwrap();
+        let (source_ix, target_ix) = g.edge_endpoints(edge).unwrap();
         let source_osm = g.node_weight(source_ix).unwrap().clone();
         let target_osm = g.node_weight(target_ix).unwrap().clone();
         let weight = *g.edge_weight(edge).unwrap();
@@ -846,7 +875,7 @@ fn add_edges_external_to_intersection(
 }
 
 /**
-Intersections, like FourWays, are represented by several internal nodes (all with the same OSM NodeId and coordinates). Each direction away from the intersection has a "incoming" and an "outgoing" node. This method connects the incoiming nodes to their respective outgoing nodes, adding a penalty if necessary. So, for example, if left turns are being penalized, then the incoming node from the west would connect to the outgoing node for the north, but with the left turn penalty added.
+Adds the "internal" edges at each intersection that penalize certain kinds of turns. Intersections are represented by several internal nodes (all with the same OSM NodeId and coordinates). Each direction away from the intersection (towards a different OSM NodeId) has a "incoming" and an "outgoing" node. This method connects the incoming nodes to their respective outgoing nodes, adding a penalty if necessary. So, for example, if left turns are being penalized, then the incoming node from the west would connect to the outgoing node for the north, but with the left turn penalty added.
 */
 fn add_internal_interesection_edges(
     g: &Graph<Node, f32, Directed>,
@@ -856,122 +885,102 @@ fn add_internal_interesection_edges(
     // every "intersection" has a type and an associated list of clones. Handle each type differently
     for (orig_node, clone_list) in clone_data {
         match clone_list.intersection_type {
-
             IntersectionType::FourWay => {
-                println!("clone list: {:?}",&clone_list.neighbor_clone_pairs);
-                let center_osm_node = g.node_weight(orig_node).unwrap();
-                let incoming = get_incoming(&clone_list.neighbor_clone_pairs, new_g);
-
-                let incoming = pair_with_neighbor(&incoming,&new_g);
-                let outgoing = get_outgoing(&clone_list.neighbor_clone_pairs, new_g);
-                let outgoing = pair_with_neighbor(&outgoing,new_g);
-                let outgoing = sort_clockwise(center_osm_node,&outgoing);
-
-                println!("incoming:{:?}",incoming);
-                println!("outgoing:{:?}",outgoing);
-                for (neighbor,incoming_node) in incoming {
-                    // for every direction
-                    let index = outgoing.iter().position(|(a,b)| {
-                        (neighbor).eq(a)
-                    }).unwrap();
-                    let left = outgoing[(index+1)%4].1;
-                    let straight = outgoing[(index+2)%4].1;
-                    let right = outgoing[(index+3)%4].1;
+                let (incoming, outgoing) = get_incoming_and_outgoing_with_neighbors_sorted(
+                    &clone_list.neighbor_clone_pairs,
+                    new_g,
+                );
+                for (neighbor, incoming_node) in incoming {
+                    let outgoing_ix = outgoing.iter().position(|(a, b)| (neighbor).eq(a)).unwrap();
+                    let left = outgoing[(outgoing_ix + 1) % 4].1;
+                    let straight = outgoing[(outgoing_ix + 2) % 4].1;
+                    let right = outgoing[(outgoing_ix + 3) % 4].1;
                     new_g.add_edge(incoming_node, left, LEFT_TURN_PENALTY);
                     new_g.add_edge(incoming_node, straight, STRAIGHT_PENALTY);
                     new_g.add_edge(incoming_node, right, RIGHT_TURN_PENALTY);
                 }
-            },
+            }
             IntersectionType::Isolate => {
                 // because they have no edges, these isolated nodes were never added during add_edges_external_to_intersection(), but later we want our new graph to have the same osm_nodes as the original, so we copy the node here
                 let osm_node = g.node_weight(orig_node).unwrap().clone();
                 new_g.add_node(osm_node);
-            },
-            _ => {}
+            }
+            _ => {
+                // DEFAULT CASE
+                // if it's an unusual intersection with many neighbors, just ignore penalties as these situations are strange and uncommon. This still doesn't allow u-turns (where an incoming clone would have an edge to its own corresponding outgoing clone).
+                let (incoming, outgoing) = get_incoming_and_outgoing_with_neighbors_sorted(
+                    &clone_list.neighbor_clone_pairs,
+                    new_g,
+                );
+                for (neighbor, incoming_node) in incoming {
+                    let outgoing_ix = outgoing.iter().position(|(a, b)| (neighbor).eq(a)).unwrap();
+                    for (i, item) in outgoing.iter().enumerate() {
+                        if i != outgoing_ix {
+                            new_g.add_edge(incoming_node, item.1, 0.0);
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-fn get_incoming(node_list: &Vec<NodeIndex>, g: &Graph<Node,f32,Directed>) -> Vec<NodeIndex> {
-    node_list.iter()
-        .filter(|&&node_ix| {
-            g.first_edge(node_ix,Incoming).is_some()
-        })
-        .map(|a|*a)
+/**
+Given a list of clones and the new graph, it returns that same list clones as two lists (incoming and outgoing) with each list item being the neighboring osm node that clone is associated with and the NodeIndex of the clone.
+*/
+fn get_incoming_and_outgoing_with_neighbors_sorted(
+    clones: &[NodeIndex],
+    new_graph: &Graph<Node, f32, Directed>,
+) -> (Vec<(Node, NodeIndex)>, Vec<(Node, NodeIndex)>) {
+    let incoming = get_incoming(clones, &new_graph);
+    let incoming = pair_with_neighbor(&incoming, &new_graph);
+    let outgoing = get_outgoing(clones, &new_graph);
+    let outgoing = pair_with_neighbor(&outgoing, &new_graph);
+    let orig_osm_node = new_graph
+        .node_weight(*clones.iter().next().unwrap())
+        .unwrap();
+    let outgoing = sort_clockwise(orig_osm_node, &outgoing);
+    (incoming, outgoing)
+}
+
+fn get_incoming(node_list: &[NodeIndex], g: &Graph<Node, f32, Directed>) -> Vec<NodeIndex> {
+    node_list
+        .iter()
+        .filter(|&&node_ix| g.first_edge(node_ix, Incoming).is_some())
+        .copied()
         .collect()
 }
 
-fn get_outgoing(node_list: &Vec<NodeIndex>, g: &Graph<Node,f32,Directed>) -> Vec<NodeIndex> {
-    node_list.iter()
-        .filter(|&&node_ix| {
-            g.first_edge(node_ix,Outgoing).is_some()
-        })
-        .map(|a| *a)
+fn get_outgoing(node_list: &[NodeIndex], g: &Graph<Node, f32, Directed>) -> Vec<NodeIndex> {
+    node_list
+        .iter()
+        .filter(|&&node_ix| g.first_edge(node_ix, Outgoing).is_some())
+        .copied()
         .collect()
 }
 
-fn is_incoming(node_ix: &NodeIndex, g: &Graph<Node,f32,Directed>) -> bool {
-    true
-}
-
-fn pair_with_neighbor(node_list: &Vec<NodeIndex>, g: &Graph<Node,f32,Directed>) -> Vec<(Node,NodeIndex)> {
-    node_list.iter()
+fn pair_with_neighbor(
+    node_list: &[NodeIndex],
+    g: &Graph<Node, f32, Directed>,
+) -> Vec<(Node, NodeIndex)> {
+    node_list
+        .iter()
         .map(|&a| {
             // the "neighbors" method of petgraph returns 0 if there are only incoming edges to that node (why??)
             if g.neighbors(a).count() == 0 {
-                let mut edges = g.edges_directed(a,Incoming);
+                let mut edges = g.edges_directed(a, Incoming);
                 let neighbor_ix = edges.next().unwrap().source();
                 let neighbor = g.node_weight(neighbor_ix).unwrap().clone();
-                (neighbor,a)
+                (neighbor, a)
             } else {
-                let mut edges = g.edges_directed(a,Outgoing);
+                let mut edges = g.edges_directed(a, Outgoing);
                 let neighbor_ix = edges.next().unwrap().target();
                 let neighbor = g.node_weight(neighbor_ix).unwrap().clone();
-                (neighbor,a)
+                (neighbor, a)
             }
         })
         .collect()
 }
-
-// get outgoing, sort by direction (make into tuple ?)
-// find index of where it is in that list, then count off from it
-
-// TODO: make this work
-fn sort_clone_list(clone_list: &Vec<NodeIndex>, new_g: &Graph<Node,f32,Directed>) -> Vec<NodeIndex> {
-    let mut clone_list = clone_list.clone();
-    let center = new_g.node_weight(clone_list[0]).unwrap().clone();
-    let neighbors_and_clones:Vec<(Node,NodeIndex)> = clone_list.into_iter()
-        .map(|node_ix| {
-            let neighbor_ix = new_g.neighbors(node_ix).next().unwrap();
-            let neighbor_osm_node = new_g.node_weight(neighbor_ix).unwrap().clone();
-            (neighbor_osm_node, node_ix)
-        })
-        .collect();
-    let mut neighbor_angles: Vec<(f64, (Node, NodeIndex))> = neighbors_and_clones
-        .iter()
-        .map(|(neighbor_node, clone_ix)| {
-            let dx = neighbor_node.lon() - center.lon();
-            let dy = neighbor_node.lat() - center.lat();
-            let angle = dy.atan2(dx);
-            (angle, (neighbor_node.clone(), *clone_ix))
-        })
-        .collect();
-    neighbor_angles.sort_by(|a,b| {
-        let clone_ix = (a.1).1;
-        if new_g.edges_directed(clone_ix,Incoming).count() == 1 {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    });
-    neighbor_angles.sort_by(|a, b| (-a.0).partial_cmp(&(-b.0)).unwrap());
-
-    neighbor_angles
-        .into_iter()
-        .map(|(_angle, (_node, node_ix))| node_ix)
-        .collect()
-}
-
 
 /**
 List of clones sorted by the direction of the neighbor they will eventually have an outgoing edge to. Sorted in clockwise order.
@@ -979,26 +988,23 @@ List of clones sorted by the direction of the neighbor they will eventually have
 #[derive(Debug, PartialEq)]
 struct CloneList {
     neighbor_clone_pairs: Vec<NodeIndex>,
-    intersection_type: IntersectionType
+    intersection_type: IntersectionType,
 }
 
 impl CloneList {
-
     fn new(intersection_type: IntersectionType) -> CloneList {
         CloneList {
             neighbor_clone_pairs: Vec::new(),
-            intersection_type
+            intersection_type,
         }
     }
 
-    fn add_clone_node(clone_node: NodeIndex) {
-
-    }
+    fn add_clone_node(clone_node: NodeIndex) {}
 }
 
 fn sort_clockwise(
     center: &Node,
-    neighbors_and_clones: &Vec<(Node, NodeIndex)>,
+    neighbors_and_clones: &[(Node, NodeIndex)],
 ) -> Vec<(Node, NodeIndex)> {
     let mut neighbor_angles: Vec<(f64, (Node, NodeIndex))> = neighbors_and_clones
         .iter()
@@ -1023,7 +1029,18 @@ enum IntersectionType {
     MiddleOfRoad,
     TIntersection,
     FourWay,
-    Other
+    Other,
+}
+
+/**
+Finds index of graph node that has the given osm_node. If more than one node contains it, this returns the first one found.
+*/
+fn node_ix_with_osm_id(
+    osm_node_id: i64,
+    g: &Graph<Node, f32, Directed>,
+) -> Option<NodeIndex> {
+    g.node_indices()
+        .find(|&node_ix| osm_node_id == g.node_weight(node_ix).unwrap().id.0)
 }
 
 /**
@@ -1037,12 +1054,26 @@ mod tests {
     fn test_simplify_no_nodes() {
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 0);
+        let result = simplify_graph(&test_graph, &min_dist);
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
     fn test_simplify_one_node() {
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
         let node0: Node = Node {
@@ -1051,18 +1082,38 @@ mod tests {
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
-        let n0 = test_graph.add_node(node0);
+        let n0 = test_graph.add_node(node0.clone());
         min_dist.insert(n0, Some(0.0)); // one node is "reachable"
-        let result = simplify_to_undirected(&test_graph, &min_dist);
+        let result = simplify_graph(&test_graph, &min_dist);
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
+        exp_result.add_node(node0.clone());
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
+
         assert_eq!(result.node_count(), 1);
         min_dist.clear();
         min_dist.insert(n0, None); // the node is not "reachable" (doesn't really make sense but worth testing)
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 1);
+        let result = simplify_graph(&test_graph, &min_dist);
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
+        exp_result.add_node(node0.clone());
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
     fn test_simplify_two_nodes_disconnected() {
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
         let node0: Node = Node {
@@ -1071,25 +1122,37 @@ mod tests {
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
-        let n0 = test_graph.add_node(node0);
-        let node0: Node = Node {
+        let node1: Node = Node {
             id: NodeId(1),
             tags: Default::default(),
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
-        let n1 = test_graph.add_node(node0);
-        min_dist.insert(n0, None); // one node is "reachable"
-        min_dist.insert(n1, None); // one node is "reachable"
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 2);
-        assert_eq!(result.edge_count(), 0);
+        let n0 = test_graph.add_node(node0.clone());
+        let n1 = test_graph.add_node(node1.clone());
+        min_dist.insert(n0, None); // node is "unreachable"
+        min_dist.insert(n1, None); // also "unreachable"
+        let result = simplify_graph(&test_graph, &min_dist);
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
+        exp_result.add_node(node0.clone());
+        exp_result.add_node(node1.clone());
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
+
         min_dist.clear();
         min_dist.insert(n0, Some(10.0)); // one node is "reachable"
         min_dist.insert(n1, Some(5.0)); // one node is "reachable"
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 2);
-        assert_eq!(result.edge_count(), 0);
+        let result = simplify_graph(&test_graph, &min_dist);
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
@@ -1108,20 +1171,28 @@ mod tests {
         };
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
-        let n0 = test_graph.add_node(node0);
-        let n1 = test_graph.add_node(node1);
+        let n0 = test_graph.add_node(node0.clone());
+        let n1 = test_graph.add_node(node1.clone());
         test_graph.add_edge(n0, n1, 10.0);
         min_dist.insert(n0, Some(0.0));
         min_dist.insert(n1, Some(10.0));
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 2);
-        assert_eq!(result.edge_count(), 1);
-        assert_eq!(
-            *result
-                .edge_weight(result.edge_indices().next().unwrap())
-                .unwrap(),
-            5.0
-        );
+        let result = simplify_graph(&test_graph, &min_dist);
+
+        // build exp_result
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
+        let n0 = exp_result.add_node(node0.clone());
+        let n1 = exp_result.add_node(node1.clone());
+        exp_result.add_edge(n0, n1, Some(5.0));
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
@@ -1140,25 +1211,33 @@ mod tests {
         };
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
-        let n0 = test_graph.add_node(node0);
-        let n1 = test_graph.add_node(node1);
+        let n0 = test_graph.add_node(node0.clone());
+        let n1 = test_graph.add_node(node1.clone());
         test_graph.add_edge(n0, n1, 100.0);
         test_graph.add_edge(n1, n0, 200.0);
         min_dist.insert(n0, Some(10.0));
         min_dist.insert(n1, Some(20.0));
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 2);
-        assert_eq!(result.edge_count(), 1);
-        assert_eq!(
-            *result
-                .edge_weight(result.edge_indices().next().unwrap())
-                .unwrap(),
-            15.0
-        );
+        let result = simplify_graph(&test_graph, &min_dist);
+
+        // build exp_result
+        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let n0 = exp_result.add_node(node0.clone());
+        let n1 = exp_result.add_node(node1.clone());
+        exp_result.add_edge(n0, n1, 15.0);
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
-    fn test_two_clones_no_edges_deconstruction() {
+    fn test_simplify_two_clones_no_edges() {
         // because there are two "clones" (i.e. nodes in the graph representing the same OSM NodeId), the final graph should have only one node and no edges
         let node0: Node = Node {
             id: NodeId(0),
@@ -1178,79 +1257,172 @@ mod tests {
         let n1 = test_graph.add_node(node1);
         min_dist.insert(n0, Some(10.0));
         min_dist.insert(n1, Some(20.0));
-        let result = simplify_to_undirected(&test_graph, &min_dist);
+        let result = simplify_graph(&test_graph, &min_dist);
         assert_eq!(result.node_count(), 1);
         assert_eq!(result.edge_count(), 0);
     }
 
     #[test]
     fn test_simplify_multi_clones_multi_edges() {
-        let node0_clone0: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let node0_clone1: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let node1_clone0: Node = Node {
+        let node1: Node = Node {
             id: NodeId(1),
             tags: Default::default(),
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
-        let node1_clone1: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let node1_clone2: Node = Node {
-            id: NodeId(1),
+        let node2: Node = Node {
+            id: NodeId(2),
             tags: Default::default(),
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
         let node3: Node = Node {
-            id: NodeId(2),
+            id: NodeId(3),
             tags: Default::default(),
             decimicro_lat: 0,
             decimicro_lon: 0,
         };
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
-        let n0_c0 = test_graph.add_node(node0_clone0);
-        let n0_c1 = test_graph.add_node(node0_clone1);
-        let n1_c0 = test_graph.add_node(node1_clone0);
-        let n1_c1 = test_graph.add_node(node1_clone1);
-        let n1_c2 = test_graph.add_node(node1_clone2);
-        let n3 = test_graph.add_node(node3);
-        min_dist.insert(n0_c0, Some(0.0));
-        min_dist.insert(n0_c1, Some(10.0));
-        min_dist.insert(n1_c0, Some(20.0));
-        min_dist.insert(n1_c1, Some(30.0));
-        min_dist.insert(n1_c2, None);
+        let n1_c1 = test_graph.add_node(node1.clone());
+        let n1_c2 = test_graph.add_node(node1.clone());
+        let n2_c1 = test_graph.add_node(node2.clone());
+        let n2_c2 = test_graph.add_node(node2.clone());
+        let n2_c3 = test_graph.add_node(node2.clone());
+        let n3 = test_graph.add_node(node3.clone());
+        min_dist.insert(n1_c1, Some(0.0));
+        min_dist.insert(n1_c2, Some(10.0));
+        min_dist.insert(n2_c1, Some(20.0));
+        min_dist.insert(n2_c2, Some(30.0));
+        min_dist.insert(n2_c3, None);
         min_dist.insert(n3, None);
-        test_graph.add_edge(n0_c0, n1_c0, 7.0); // these edge weights don't actually matter
-        test_graph.add_edge(n0_c1, n1_c0, 7.0);
-        test_graph.add_edge(n1_c0, n0_c0, 7.0);
-        test_graph.add_edge(n1_c1, n0_c1, 7.0);
-        test_graph.add_edge(n1_c0, n0_c1, 7.0);
-        test_graph.add_edge(n1_c2, n0_c0, 7.0);
-        test_graph.add_edge(n3, n1_c0, 7.0);
-        let result = simplify_to_undirected(&test_graph, &min_dist);
-        assert_eq!(result.node_count(), 3);
-        assert_eq!(result.edge_count(), 2);
-        assert_eq!(
-            *result
-                .edge_weight(result.edge_indices().next().unwrap())
-                .unwrap(),
-            10.0
-        );
+        test_graph.add_edge(n1_c1, n2_c1, 7.0); // these edge weights don't actually matter
+        test_graph.add_edge(n1_c2, n2_c1, 7.0);
+        test_graph.add_edge(n2_c1, n1_c1, 7.0);
+        test_graph.add_edge(n2_c2, n1_c2, 7.0);
+        test_graph.add_edge(n2_c1, n1_c2, 7.0);
+        test_graph.add_edge(n2_c3, n1_c1, 7.0);
+        test_graph.add_edge(n3, n2_c1, 7.0);
+        let result = simplify_graph(&test_graph, &min_dist);
+
+        // build exp_result
+        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let n1 = exp_result.add_node(node1.clone());
+        let n2 = exp_result.add_node(node2.clone());
+        let n3 = exp_result.add_node(node3.clone());
+        exp_result.add_edge(n1, n2, 10.0);
+        exp_result.add_edge(n2, n3, std::f32::MAX);
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
+    }
+
+    /**
+    build graph with multiple clones with edges between each one (the result will be a graph with a single edge and no nodes)
+    */
+    #[test]
+    fn test_interclone_edges() {
+        let node1: Node = Node {
+            id: NodeId(1),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        };
+        let mut test_graph = Graph::<Node, f32, Directed>::new();
+        let clone1 = test_graph.add_node(node1.clone());
+        let clone2 = test_graph.add_node(node1.clone());
+        let clone3 = test_graph.add_node(node1.clone());
+        // add edges (edge weights don't matter)
+        test_graph.add_edge(clone1, clone2, 5.0);
+        test_graph.add_edge(clone2, clone1, 6.0);
+        test_graph.add_edge(clone2, clone3, 5.0);
+
+        let mut min_dist = HashMap::new();
+        min_dist.insert(clone1, Some(10.0));
+        min_dist.insert(clone2, Some(20.0));
+        min_dist.insert(clone3, None);
+
+        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        exp_result.add_node(node1.clone());
+
+        let result = simplify_graph(&test_graph, &min_dist);
+
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        assert!(is_isomorphic_matching(
+            &exp_result,
+            &result,
+            node_match,
+            edge_match
+        ));
+    }
+
+    #[test]
+    fn test_simplify_fourway() {
+        let clone_graph = clones_fourway();
+        let min_dist = djikstra_float(&clone_graph, NodeIndex::new(7));
+        let result = simplify_graph(&clone_graph, &min_dist);
+
+        let center_node: Node = Node {
+            id: NodeId(0),
+            tags: Default::default(),
+            decimicro_lat: 0,
+            decimicro_lon: 0,
+        };
+        let west_node: Node = Node {
+            id: NodeId(1),
+            tags: Default::default(),
+            decimicro_lat: 1,
+            decimicro_lon: -10,
+        };
+        let north_node: Node = Node {
+            id: NodeId(2),
+            tags: Default::default(),
+            decimicro_lat: 10,
+            decimicro_lon: 1,
+        };
+        let east_node: Node = Node {
+            id: NodeId(3),
+            tags: Default::default(),
+            decimicro_lat: -1,
+            decimicro_lon: 10,
+        };
+        let south_node: Node = Node {
+            id: NodeId(4),
+            tags: Default::default(),
+            decimicro_lat: -10,
+            decimicro_lon: -1,
+        };
+
+        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let c = exp_result.add_node(center_node);
+        let w = exp_result.add_node(west_node);
+        let n = exp_result.add_node(north_node);
+        let e = exp_result.add_node(east_node);
+        let s = exp_result.add_node(south_node);
+        exp_result.add_edge(w, c, 4.0 + LEFT_TURN_PENALTY + 1.0 * 0.5);
+        exp_result.add_edge(n, c, 4.0 + STRAIGHT_PENALTY + 2.0 * 0.5);
+        exp_result.add_edge(e, c, 4.0 + RIGHT_TURN_PENALTY + 3.0 * 0.5);
+        exp_result.add_edge(s, c, 4.0 * 0.5);
+
+        // test for equality (graph isomorphism)
+        // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
+        let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
+        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        assert!(is_isomorphic_matching(
+            &result,
+            &exp_result,
+            node_match,
+            edge_match
+        ));
     }
 
     // TEST DIFFERENCE GRAPH
@@ -1503,7 +1675,7 @@ mod tests {
     Helper for other tests
     A simple 4 way intersection. Any changes to this should also be made to "clones_fourway()" because they are supposed to represent the same situation, just before and after making the clone graph.
     */
-    fn simple_fourway() -> Graph<Node, f32, Directed> {
+    pub fn simple_fourway() -> Graph<Node, f32, Directed> {
         let center_node: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1559,7 +1731,7 @@ mod tests {
     Helper for other tests
     Creates a modified graph with a 4 way intersection. The edge weights leaving the intersection all have different values, but don'at actually represent the geographical distance (to make it simple).
     */
-    fn clones_fourway() -> Graph<Node, f32, Directed> {
+    pub fn clones_fourway() -> Graph<Node, f32, Directed> {
         let center_node: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1708,7 +1880,6 @@ mod tests {
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
         let edge_match = |e1: &f32, e2: &f32| e1 == e2;
 
-
         // test empty graph
         let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
         let result = modify_graph(&orig_graph);
@@ -1782,7 +1953,6 @@ mod tests {
         ));
     }
 
-
     /**
     It would be annoying to make this a real test using assertions since I can't guarantee the node indices are stable in the graph and I'd have to do some acrobatics to make it always work, so just run the code and make sure the assert! at the end is set to false and it will print results to console to manually check.
     */
@@ -1790,7 +1960,7 @@ mod tests {
     #[ignore]
     fn manual_test_min_dist() {
         let modified_graph = clones_fourway();
-        let min_dist = djikstra_float(&modified_graph,NodeIndex::new(1));
+        let min_dist = djikstra_float(&modified_graph, NodeIndex::new(1));
 
         print_edges(&modified_graph);
         println!("CHECKING MIN DIST");
@@ -1806,85 +1976,48 @@ mod tests {
     /**
     Useful for printing a graph to the console for manually checking the structure of a graph.
     */
-    fn print_edges(g: &Graph<Node, f32, Directed>) {
-        println!("GRAPH EDGES ({} nodes, {} edges)", g.node_count(), g.edge_count());
+    pub fn print_edges(g: &Graph<Node, f32, Directed>) {
+        println!(
+            "GRAPH EDGES ({} nodes, {} edges)",
+            g.node_count(),
+            g.edge_count()
+        );
         for edge in g.edge_indices() {
-            let (source_ix,target_ix) = g.edge_endpoints(edge).unwrap();
+            let (source_ix, target_ix) = g.edge_endpoints(edge).unwrap();
             let source_osm = g.node_weight(source_ix).unwrap().id.0;
             let target_osm = g.node_weight(target_ix).unwrap().id.0;
             let weight = g.edge_weight(edge).unwrap();
-            println!("((osm:{},ix:{}) -> (osm:{},ix:{})) : {}", source_osm, source_ix.index(), target_osm, target_ix.index(), weight);
+            println!(
+                "((osm:{},ix:{}) -> (osm:{},ix:{})) : {}",
+                source_osm,
+                source_ix.index(),
+                target_osm,
+                target_ix.index(),
+                weight
+            );
         }
     }
 
-    #[test]
-    fn test_sort_clone_list() {
-        let mut test_graph = clones_fourway();
-        let center_node: Node = Node {
-            id: NodeId(0),
-            tags: Default::default(),
-            decimicro_lat: 0,
-            decimicro_lon: 0,
-        };
-        let west_node: Node = Node {
-            id: NodeId(1),
-            tags: Default::default(),
-            decimicro_lat: 1,
-            decimicro_lon: -10,
-        };
-        let north_node: Node = Node {
-            id: NodeId(2),
-            tags: Default::default(),
-            decimicro_lat: 10,
-            decimicro_lon: 1,
-        };
-        let east_node: Node = Node {
-            id: NodeId(3),
-            tags: Default::default(),
-            decimicro_lat: -1,
-            decimicro_lon: 10,
-        };
-        let south_node: Node = Node {
-            id: NodeId(4),
-            tags: Default::default(),
-            decimicro_lat: -10,
-            decimicro_lon: -1,
-        };
-
-        let w_in = test_graph.add_node(west_node.clone());
-        let w_out = test_graph.add_node(west_node.clone());
-        let n_in = test_graph.add_node(north_node.clone());
-        let n_out = test_graph.add_node(north_node.clone());
-        let e_in = test_graph.add_node(east_node.clone());
-        let e_out = test_graph.add_node(east_node.clone());
-        let s_in = test_graph.add_node(south_node.clone());
-        let s_out = test_graph.add_node(south_node.clone());
-        // each center clone has a respective direction (west, east, etc.) and there are two nodes for each direction (for the incoming edge and the outgoing edge)
-        let center_w_in = test_graph.add_node(center_node.clone());
-        let center_w_out = test_graph.add_node(center_node.clone());
-        let center_n_in = test_graph.add_node(center_node.clone());
-        let center_n_out = test_graph.add_node(center_node.clone());
-        let center_e_in = test_graph.add_node(center_node.clone());
-        let center_e_out = test_graph.add_node(center_node.clone());
-        let center_s_in = test_graph.add_node(center_node.clone());
-        let center_s_out = test_graph.add_node(center_node.clone());
-
-        // add edges coming into the intersection
-        test_graph.add_edge(w_out, center_w_in, 1.0);
-        test_graph.add_edge(n_out, center_n_in, 2.0);
-        test_graph.add_edge(e_out, center_e_in, 3.0);
-        test_graph.add_edge(s_out, center_s_in, 4.0);
-
-        // add edges leaving the intersection
-        test_graph.add_edge(center_w_out, w_in, 1.0);
-        test_graph.add_edge(center_n_out, n_in, 2.0);
-        test_graph.add_edge(center_e_out, e_in, 3.0);
-        test_graph.add_edge(center_s_out, s_in, 4.0);
-
-        let clone_list = vec!(center_s_out, center_w_in, center_w_out, center_s_in, center_n_in, center_e_in, center_e_out, center_n_out);
-        assert_eq!(8,clone_list.len());
-        let exp_result = vec!(center_w_in, center_w_out, center_n_in, center_n_out, center_e_in, center_e_out, center_s_in, center_s_in);
-        let result = sort_clone_list(&clone_list, &test_graph);
+    pub fn print_edges_undirected(g: &Graph<Node, Option<f32>, Undirected>) {
+        println!(
+            "GRAPH EDGES ({} nodes, {} edges)",
+            g.node_count(),
+            g.edge_count()
+        );
+        for edge in g.edge_indices() {
+            let (source_ix, target_ix) = g.edge_endpoints(edge).unwrap();
+            let source_osm = g.node_weight(source_ix).unwrap().id.0;
+            let target_osm = g.node_weight(target_ix).unwrap().id.0;
+            let weight = g.edge_weight(edge).unwrap();
+            println!(
+                "((osm:{},ix:{}) -> (osm:{},ix:{})) : {}",
+                source_osm,
+                source_ix.index(),
+                target_osm,
+                target_ix.index(),
+                weight.unwrap_or(std::f32::MAX)
+            );
+        }
     }
 
     #[test]
@@ -1911,10 +2044,9 @@ mod tests {
         let node4: Node = Node {
             id: NodeId(4),
             tags: Default::default(),
-            decimicro_lat:-10,
+            decimicro_lat: -10,
             decimicro_lon: -1,
         };
-
 
         let center1: Node = Node {
             id: NodeId(5),
@@ -1951,24 +2083,28 @@ mod tests {
         let c3 = test_graph.add_node(center3);
         let c4 = test_graph.add_node(center4);
 
-        test_graph.add_edge(c1,n1,1.0);
-        test_graph.add_edge(c2,n2,1.0);
-        test_graph.add_edge(n3,c3,1.0);
-        test_graph.add_edge(c4,n4,1.0);
+        test_graph.add_edge(c1, n1, 1.0);
+        test_graph.add_edge(c2, n2, 1.0);
+        test_graph.add_edge(n3, c3, 1.0);
+        test_graph.add_edge(c4, n4, 1.0);
 
-        let clone_list = vec!(c2,c3,c1,c4);
-        let incoming = get_incoming(&clone_list,&test_graph);
-        let exp_incoming = vec!(c3);
+        let clone_list = vec![c2, c3, c1, c4];
+        let incoming = get_incoming(&clone_list, &test_graph);
+        let exp_incoming = vec![c3];
         assert_eq!(incoming, exp_incoming);
-        let outgoing = get_outgoing(&clone_list,&test_graph);
-        let exp_outgoing = vec!(c2,c1,c4);
+        let outgoing = get_outgoing(&clone_list, &test_graph);
+        let exp_outgoing = vec![c2, c1, c4];
         assert_eq!(outgoing, exp_outgoing);
 
-        let incoming_pair = pair_with_neighbor(&incoming,&test_graph);
-        let exp_in_pair = vec!((node3.clone(),c3));
+        let incoming_pair = pair_with_neighbor(&incoming, &test_graph);
+        let exp_in_pair = vec![(node3.clone(), c3)];
         assert_eq!(incoming_pair, exp_in_pair);
-        let outgoing_pair = pair_with_neighbor(&outgoing,&test_graph);
-        let exp_out_pair = vec!((node2.clone(),c2),(node1.clone(),c1),(node4.clone(),c4));
+        let outgoing_pair = pair_with_neighbor(&outgoing, &test_graph);
+        let exp_out_pair = vec![
+            (node2.clone(), c2),
+            (node1.clone(), c1),
+            (node4.clone(), c4),
+        ];
         assert_eq!(outgoing_pair, exp_out_pair);
     }
 
@@ -1983,19 +2119,38 @@ mod tests {
         let mut clone_list_1 = CloneList::new(IntersectionType::DeadEnd);
         let node_ix_1 = NodeIndex::new(1);
         let mut clone_data_exp_result = HashMap::new();
-        clone_data_exp_result.insert(node_ix_0,clone_list_0);
-        clone_data_exp_result.insert(node_ix_1,clone_list_1);
+        clone_data_exp_result.insert(node_ix_0, clone_list_0);
+        clone_data_exp_result.insert(node_ix_1, clone_list_1);
         assert_eq!(clone_data_result, clone_data_exp_result);
 
         let new_graph = add_edges_external_to_intersection(&test_graph, &mut clone_data_result);
-        assert_eq!(2,clone_data_result.get(&node_ix_0).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        assert_eq!(2,clone_data_result.get(&node_ix_1).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_0)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_1)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
         let edge_match = |e1: &f32, e2: &f32| e1 == e2;
         let exp_new_graph = clones_two_nodes();
-        assert!(is_isomorphic_matching(&new_graph, &exp_new_graph, node_match, edge_match));
+        assert!(is_isomorphic_matching(
+            &new_graph,
+            &exp_new_graph,
+            node_match,
+            edge_match
+        ));
     }
 
     #[test]
@@ -2015,20 +2170,55 @@ mod tests {
         let mut clone_list_4 = CloneList::new(IntersectionType::FourWay);
         let node_ix_4 = NodeIndex::new(4);
         let mut clone_data_exp_result = HashMap::new();
-        clone_data_exp_result.insert(node_ix_0,clone_list_0);
-        clone_data_exp_result.insert(node_ix_1,clone_list_1);
-        clone_data_exp_result.insert(node_ix_2,clone_list_2);
-        clone_data_exp_result.insert(node_ix_3,clone_list_3);
-        clone_data_exp_result.insert(node_ix_4,clone_list_4);
+        clone_data_exp_result.insert(node_ix_0, clone_list_0);
+        clone_data_exp_result.insert(node_ix_1, clone_list_1);
+        clone_data_exp_result.insert(node_ix_2, clone_list_2);
+        clone_data_exp_result.insert(node_ix_3, clone_list_3);
+        clone_data_exp_result.insert(node_ix_4, clone_list_4);
         assert_eq!(clone_data_result, clone_data_exp_result);
 
         let mut new_graph = add_edges_external_to_intersection(&test_graph, &mut clone_data_result);
-        assert_eq!(2,clone_data_result.get(&node_ix_0).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        assert_eq!(2,clone_data_result.get(&node_ix_1).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        assert_eq!(2,clone_data_result.get(&node_ix_2).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        assert_eq!(2,clone_data_result.get(&node_ix_3).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        assert_eq!(8,clone_data_result.get(&node_ix_4).unwrap().neighbor_clone_pairs.len()); //not perfect test, just tests length
-        // below are also not perfect but i'm lazy to recreate graph and it looks correct on console when i print edges
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_0)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_1)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_2)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+        assert_eq!(
+            2,
+            clone_data_result
+                .get(&node_ix_3)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+        assert_eq!(
+            8,
+            clone_data_result
+                .get(&node_ix_4)
+                .unwrap()
+                .neighbor_clone_pairs
+                .len()
+        ); //not perfect test, just tests length
+           // below are also not perfect but i'm lazy to recreate graph and it looks correct on console when i print edges
         assert_eq!(16, new_graph.node_count());
         assert_eq!(8, new_graph.edge_count());
     }

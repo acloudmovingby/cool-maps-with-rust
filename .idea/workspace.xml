@@ -22,16 +22,23 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="199">
-              <caret line="1730" column="42" selection-start-line="1730" selection-start-column="42" selection-end-line="1730" selection-end-column="42" />
+            <state relative-caret-position="4011">
+              <caret line="625" column="95" selection-start-line="625" selection-start-column="95" selection-end-line="625" selection-end-column="95" />
               <folding>
-                <element signature="e#3186#3187#0" expanded="true" />
-                <element signature="e#3218#3219#0" expanded="true" />
-                <element signature="e#27229#27230#0" expanded="true" />
-                <element signature="e#27265#27266#0" expanded="true" />
-                <element signature="e#36497#36498#0" expanded="true" />
-                <element signature="e#36508#36509#0" expanded="true" />
+                <element signature="e#3430#3431#0" expanded="true" />
+                <element signature="e#3462#3463#0" expanded="true" />
+                <element signature="e#28970#28971#0" expanded="true" />
+                <element signature="e#29006#29007#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/nannou-0.9.0/src/math.rs">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="330">
+              <caret line="22" column="7" selection-start-line="22" selection-start-column="7" selection-end-line="22" selection-end-column="7" />
             </state>
           </provider>
         </entry>
@@ -39,8 +46,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/visit/mod.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="306">
-              <caret line="175" column="24" lean-forward="true" selection-start-line="175" selection-start-column="24" selection-end-line="175" selection-end-column="24" />
+            <state relative-caret-position="2565">
+              <caret line="175" column="24" selection-start-line="175" selection-start-column="24" selection-end-line="175" selection-end-column="24" />
             </state>
           </provider>
         </entry>
@@ -48,7 +55,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/bin/min_distance_all_points.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="273">
+            <state relative-caret-position="3750">
               <caret line="252" column="35" selection-start-line="252" selection-start-column="35" selection-end-line="252" selection-end-column="35" />
               <folding>
                 <element signature="e#2758#2759#0" expanded="true" />
@@ -63,7 +70,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/ordered-float-1.0.2/src/lib.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="315">
+            <state relative-caret-position="1320">
               <caret line="90" column="27" selection-start-line="90" selection-start-column="27" selection-end-line="90" selection-end-column="27" />
             </state>
           </provider>
@@ -72,17 +79,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/cmp.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="132">
-              <caret line="184" column="25" lean-forward="true" selection-start-line="184" selection-start-column="25" selection-end-line="184" selection-end-column="25" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/nannou-0.9.0/src/geom/scalar.rs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="15">
-              <caret line="1" column="9" selection-start-line="1" selection-start-column="9" selection-end-line="1" selection-end-column="9" />
+            <state relative-caret-position="2760">
+              <caret line="184" column="25" selection-start-line="184" selection-start-column="25" selection-end-line="184" selection-end-column="25" />
             </state>
           </provider>
         </entry>
@@ -99,8 +97,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/osmpbfreader-0.13.0/src/objects.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="335">
-              <caret line="172" column="28" lean-forward="true" selection-start-line="172" selection-start-column="28" selection-end-line="172" selection-end-column="28" />
+            <state relative-caret-position="2310">
+              <caret line="172" column="28" selection-start-line="172" selection-start-column="28" selection-end-line="172" selection-end-column="28" />
               <folding>
                 <element signature="e#2428#2429#0" expanded="true" />
                 <element signature="e#2464#2465#0" expanded="true" />
@@ -112,8 +110,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/graph_impl/mod.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="720">
-              <caret line="1404" column="4" selection-start-line="1404" selection-start-column="4" selection-end-line="1404" selection-end-column="4" />
+            <state relative-caret-position="21420">
+              <caret line="1521" selection-start-line="1521" selection-end-line="1521" />
               <folding>
                 <element signature="e#23446#23447#0" expanded="true" />
                 <element signature="e#23497#23498#0" expanded="true" />
@@ -125,8 +123,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/iter/traits/iterator.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="448">
-              <caret line="1687" column="7" lean-forward="true" selection-start-line="1687" selection-start-column="7" selection-end-line="1687" selection-end-column="7" />
+            <state relative-caret-position="24510">
+              <caret line="1687" column="7" selection-start-line="1687" selection-start-column="7" selection-end-line="1687" selection-end-column="7" />
             </state>
           </provider>
         </entry>
@@ -142,36 +140,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>TEST</find>
-      <find>prohibit_lef</find>
-      <find>trait</find>
-      <find>clockwise</find>
-      <find>clockwise_order</find>
-      <find>NodeIndex::</find>
-      <find>&amp;Road</find>
-      <find>clones_and</find>
-      <find>Node::</find>
-      <find>RoadNode {</find>
-      <find>RoadNode</find>
-      <find>new</find>
-      <find>RoadNode</find>
-      <find>neighbor_cl</find>
-      <find>FourWay</find>
-      <find>dx</find>
-      <find>CloneList</find>
-      <find>modify</find>
-      <find>tan2</find>
-      <find>sort_clock</find>
-      <find>sort_clone</find>
-      <find>index</find>
-      <find>get_incoming</find>
-      <find>get_inc</find>
+      <find>edge_match</find>
+      <find>two_node</find>
+      <find>two_nodes</find>
+      <find>print_edge</find>
+      <find>fn print_edges</find>
+      <find>print_edges_u</find>
       <find>derive</find>
-      <find>get_incom</find>
-      <find>pair_with_ne</find>
-      <find>sorted_by</find>
-      <find>clone_graph_two_no</find>
+      <find>fourway</find>
+      <find>djiks</find>
+      <find>clones_fourway(</find>
+      <find>simplify_fo</find>
+      <find>DIFFERENCE</find>
+      <find>&amp;Vec</find>
+      <find>nannou</find>
+      <find>print_edges_un</find>
       <find>isomorph</find>
+      <find>edge_diff</find>
+      <find>simple_fourway()</find>
+      <find>node_ix,</find>
+      <find>NodeIndex::ne</find>
+      <find>simplify_</find>
+      <find>sort_cloc</find>
+      <find>make_l</find>
+      <find>OrderedFl</find>
+      <find>find</find>
+      <find>find_</find>
+      <find>start_osm</find>
+      <find>make_lin</find>
+      <find>start_node</find>
+      <find>LEFT_TURN_PEN</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -213,7 +211,7 @@
     <option name="x" value="16" />
     <option name="y" value="23" />
     <option name="width" value="1322" />
-    <option name="height" value="637" />
+    <option name="height" value="609" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -440,14 +438,21 @@
       <option name="project" value="LOCAL" />
       <updated>1577121957639</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="All tests now work (including fourway clone graph), but I haven't tested yet with other components (min distance, etc.). About to delete some unused methods/testcases (sort_clone_list)">
+      <created>1577126966275</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1577126966275</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="16" y="23" width="1322" height="637" extended-state="0" />
+    <frame x="16" y="23" width="1322" height="609" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.3082942" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.31298906" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Image Layers" order="2" />
       <window_info id="Designer" order="3" />
@@ -546,25 +551,14 @@
     <MESSAGE value="sort_clockwise(...) now works and passes test. Made some of the basic tests for the modified graph construction (they do not pass yet). Have now decided that for simplicity sake we will allow penalties for left,straight, and right, but there will be NO u-turns because it's not a very interesting case and it greatly complicates the graph tests (which are crazy complicated as it is)." />
     <MESSAGE value="About to totally redo the turns project, making the modified graph be based on the ideas of lanes (two lanes for a road), as this will hopefully be much more conceptually simple and easier to reason about, although it will make even more complicated test cases." />
     <MESSAGE value="The new method (of using lanes) is now mostly implemented. Simple graphs now work correctly, but fourways and T-Intersections do not. I'm about to delete all the old test cases for the prior method (but were commented out)." />
-    <option name="LAST_COMMIT_MESSAGE" value="The new method (of using lanes) is now mostly implemented. Simple graphs now work correctly, but fourways and T-Intersections do not. I'm about to delete all the old test cases for the prior method (but were commented out)." />
+    <MESSAGE value="All tests now work (including fourway clone graph), but I haven't tested yet with other components (min distance, etc.). About to delete some unused methods/testcases (sort_clone_list)" />
+    <option name="LAST_COMMIT_MESSAGE" value="All tests now work (including fourway clone graph), but I haven't tested yet with other components (min distance, etc.). About to delete some unused methods/testcases (sort_clone_list)" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
     <select />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$USER_HOME$/nannou/examples/basics/3_variable_scope.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-311" />
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/petgraph/Cargo.toml">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="75">
-          <caret line="5" column="11" lean-forward="true" selection-start-line="5" selection-start-column="11" selection-end-line="5" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/nannou/examples/all_functions.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-1436" />
@@ -848,13 +842,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/slice.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="5490">
-          <caret line="375" column="11" selection-start-line="375" selection-start-column="11" selection-end-line="375" selection-end-column="11" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only_int.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="96">
@@ -869,19 +856,24 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only_redo.rs">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/ordered-float-1.0.2/src/lib.rs">
+    <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only_redo.rs" />
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/isomorphism.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="315">
-          <caret line="90" column="27" selection-start-line="90" selection-start-column="27" selection-end-line="90" selection-end-column="27" />
+        <state relative-caret-position="2730">
+          <caret line="184" column="7" selection-start-line="184" selection-start-column="7" selection-end-line="184" selection-end-column="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/visit/mod.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2565">
+          <caret line="175" column="24" selection-start-line="175" selection-start-column="24" selection-end-line="175" selection-end-column="24" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/min_distance_all_points.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="273">
+        <state relative-caret-position="3750">
           <caret line="252" column="35" selection-start-line="252" selection-start-column="35" selection-end-line="252" selection-end-column="35" />
           <folding>
             <element signature="e#2758#2759#0" expanded="true" />
@@ -892,28 +884,31 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/visit/mod.rs">
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/ordered-float-1.0.2/src/lib.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="306">
-          <caret line="175" column="24" lean-forward="true" selection-start-line="175" selection-start-column="24" selection-end-line="175" selection-end-column="24" />
+        <state relative-caret-position="1320">
+          <caret line="90" column="27" selection-start-line="90" selection-start-column="27" selection-end-line="90" selection-end-column="27" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/graph_impl/mod.rs">
+    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/cmp.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="720">
-          <caret line="1404" column="4" selection-start-line="1404" selection-start-column="4" selection-end-line="1404" selection-end-column="4" />
-          <folding>
-            <element signature="e#23446#23447#0" expanded="true" />
-            <element signature="e#23497#23498#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="2760">
+          <caret line="184" column="25" selection-start-line="184" selection-start-column="25" selection-end-line="184" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/liballoc/slice.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="5490">
+          <caret line="375" column="11" selection-start-line="375" selection-start-column="11" selection-end-line="375" selection-end-column="11" />
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/osmpbfreader-0.13.0/src/objects.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="335">
-          <caret line="172" column="28" lean-forward="true" selection-start-line="172" selection-start-column="28" selection-end-line="172" selection-end-column="28" />
+        <state relative-caret-position="2310">
+          <caret line="172" column="28" selection-start-line="172" selection-start-column="28" selection-end-line="172" selection-end-column="28" />
           <folding>
             <element signature="e#2428#2429#0" expanded="true" />
             <element signature="e#2464#2465#0" expanded="true" />
@@ -921,31 +916,40 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/cmp.rs">
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/petgraph-0.4.13/src/graph_impl/mod.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="132">
-          <caret line="184" column="25" lean-forward="true" selection-start-line="184" selection-start-column="25" selection-end-line="184" selection-end-column="25" />
+        <state relative-caret-position="21420">
+          <caret line="1521" selection-start-line="1521" selection-end-line="1521" />
+          <folding>
+            <element signature="e#23446#23447#0" expanded="true" />
+            <element signature="e#23497#23498#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/src/libcore/iter/traits/iterator.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="448">
-          <caret line="1687" column="7" lean-forward="true" selection-start-line="1687" selection-start-column="7" selection-end-line="1687" selection-end-column="7" />
+        <state relative-caret-position="24510">
+          <caret line="1687" column="7" selection-start-line="1687" selection-start-column="7" selection-end-line="1687" selection-end-column="7" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/nannou-0.9.0/src/math.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="330">
+          <caret line="22" column="7" selection-start-line="22" selection-start-column="7" selection-end-line="22" selection-end-column="7" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/bin/right_turns_only.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="199">
-          <caret line="1730" column="42" selection-start-line="1730" selection-start-column="42" selection-end-line="1730" selection-end-column="42" />
+        <state relative-caret-position="4011">
+          <caret line="625" column="95" selection-start-line="625" selection-start-column="95" selection-end-line="625" selection-end-column="95" />
           <folding>
-            <element signature="e#3186#3187#0" expanded="true" />
-            <element signature="e#3218#3219#0" expanded="true" />
-            <element signature="e#27229#27230#0" expanded="true" />
-            <element signature="e#27265#27266#0" expanded="true" />
-            <element signature="e#36497#36498#0" expanded="true" />
-            <element signature="e#36508#36509#0" expanded="true" />
+            <element signature="e#3430#3431#0" expanded="true" />
+            <element signature="e#3462#3463#0" expanded="true" />
+            <element signature="e#28970#28971#0" expanded="true" />
+            <element signature="e#29006#29007#0" expanded="true" />
           </folding>
         </state>
       </provider>
