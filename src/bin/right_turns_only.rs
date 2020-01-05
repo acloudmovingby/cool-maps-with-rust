@@ -1,7 +1,3 @@
-use crate::tests::clones_fourway;
-use crate::tests::print_edges;
-use crate::tests::print_edges_undirected;
-use crate::tests::simple_fourway;
 use nannou::draw::properties::Vertices;
 use nannou::prelude::*;
 use ordered_float::OrderedFloat;
@@ -111,7 +107,7 @@ const MAX_LAT: f64 = 41.82546;
 const MIN_LAT: f64 = 41.82323;*/
 
 // South of Brown University
-// (corner of Gano and Wickenden: 201383067)
+// (corner of Gano and Wickenden OSM NodeId: 201383067)
 const MAX_LON: f64 = -71.3748;
 const MIN_LON: f64 = -71.4125;
 const MAX_LAT: f64 = 41.8308;
@@ -138,7 +134,6 @@ fn main() {
 }
 
 struct Model {
-    _window: window::Id,
     road_lines: Vec<Line>, // Line stores start, end, hue, saturation, alpha, thickness
 }
 
@@ -146,38 +141,79 @@ struct Model {
 Builds the model (the data to display for nannou)
 */
 fn model(app: &App) -> Model {
-    let _window = app
-        .new_window()
-        .with_dimensions(WIN_W as u32, WIN_H as u32)
-        .view(view)
-        .event(window_event)
-        .build()
-        .unwrap();
-
+    // TODO: these are local paths on my computer, need to either add to github directory or make program take filename as argument when run from command line
     let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
                                                                                      //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
-    let mut pbf = osmpbfreader::OsmPbfReader::new(r);
+    let orig_graph = create_road_graph_from_map_data(filename);
+    let modified_graph = modify_graph(&orig_graph);
 
-    let mut nodes = HashMap::new();
-    let mut all_roads: Vec<Way> = Vec::new();
+    let osm_id_of_starting_point = 201383067;
 
-    // READING MAP DATA
-    for obj in pbf.par_iter().map(Result::unwrap) {
-        match obj {
-            osmpbfreader::OsmObj::Node(node) => {
-                if is_in_outer_bounds(&node) {
-                    nodes.insert(node.id, node);
-                }
-            }
-            osmpbfreader::OsmObj::Way(way) => {
-                if way.tags.contains_key("highway") {
-                    all_roads.push(way);
-                }
-            }
-            osmpbfreader::OsmObj::Relation(_rel) => {}
-        }
+    let orig_start_node_ix = find_node_ix_given_node_weight(osm_id_of_starting_point, &orig_graph).unwrap();
+    let orig_min_dist_to_nodes = djikstra_float(&orig_graph, orig_start_node_ix);
+    let modified_start_node_ix = find_node_ix_given_node_weight(osm_id_of_starting_point, &modified_graph).unwrap();
+    let modified_min_dist_to_nodes = djikstra_float(&modified_graph, modified_start_node_ix);
+
+
+    // now make graphs where the edges themselves represent the min distances. (it takes the min distance to each endpoint and averages them--graph with clones it takes whichever clone endpoints have the smallest average)
+    let orig_min_dist = simplify_graph(&orig_graph, &orig_min_dist_to_nodes);
+    let modified_min_dist = simplify_graph(&modified_graph, &modified_min_dist_to_nodes);
+
+    // subtract difference between original and modified graphs
+    let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
+
+    // convert into Lines for easy nannou drawing
+    let road_lines = make_lines_for_nannou(&difference_graph);
+    println!("lines made");
+    Model {
+        road_lines,
     }
+}
+
+fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
+    match event {
+        KeyPressed(_key) => {}
+        KeyReleased(_key) => {}
+        MouseMoved(_pos) => {}
+        MousePressed(_button) => {}
+        MouseReleased(_button) => {}
+        MouseEntered => {}
+        MouseExited => {}
+        MouseWheel(_amount, _phase) => {}
+        Moved(_pos) => {}
+        Resized(_size) => {}
+        Touch(_touch) => {}
+        TouchPressure(_pressure) => {}
+        HoveredFile(_path) => {}
+        DroppedFile(_path) => {}
+        HoveredFileCancelled => {}
+        Focused => {}
+        Unfocused => {}
+        Closed => {}
+    }
+}
+
+fn view(app: &App, model: &Model, frame: Frame) -> Frame {
+    let _win = app.window_rect();
+    // Prepare to draw.
+    let draw = app.draw();
+
+    for road_line in model.road_lines.iter() {
+        draw.line()
+            .points(road_line.start, road_line.end)
+            .thickness(road_line.thickness) // at some point draw according to geographical size ?
+            .hsva(road_line.hue, road_line.saturation, 1.0, road_line.alpha);
+    }
+
+    draw.background().hsv(0.73, 0.55, 0.06);
+    // Write to the window frame.
+    draw.to_frame(app, &frame).unwrap();
+    // Return the drawn frame.
+    frame
+}
+
+fn create_road_graph_from_map_data(filename: &str) -> Graph<Node,f32,Directed> {
+    let (nodes, all_roads) = get_nodes_and_ways_from_map_data(filename);
 
     // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
     // roads thus represents all the Ways that have at least one node in the map bounds
@@ -197,6 +233,9 @@ fn model(app: &App) -> Model {
             roads.push(road);
         }
     }
+    // get nodes and ways from map data
+    // remove out of bounds ways
+    // use ways to build road graph
 
     // BUILD GRAPH
     // make hashmap of node ids to node indices
@@ -244,77 +283,39 @@ fn model(app: &App) -> Model {
             }
         }
     }
-
-    let modified_graph = modify_graph(&road_graph);
-
-    let start_osm_id = 201383067;
-    // find min dist from starting point to ever
-    let orig_start_node_ix = node_ix_with_osm_id(start_osm_id, &road_graph).unwrap();
-
-    let orig_min_dist_to_nodes = djikstra_float(&road_graph, orig_start_node_ix);
-
-    let modified_start_node_ix = node_ix_with_osm_id(start_osm_id, &modified_graph).unwrap();
-    let modified_min_dist_to_nodes = djikstra_float(&modified_graph, modified_start_node_ix);
-
-    // now make graphs where the edges themselves represent the min distances. (it takes the min distance to each endpoint and averages them--graph with clones it takes whichever clone endpoints have the smallest average)
-    let orig_min_dist = simplify_graph(&road_graph, &orig_min_dist_to_nodes);
-    let modified_min_dist = simplify_graph(&modified_graph, &modified_min_dist_to_nodes);
-    // subtract difference between original and modified graphs
-    let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
-
-    print_edges_undirected(&difference_graph);
-
-    // convert into Lines for easy nannou drawing
-    let road_lines = make_lines_for_nannou(&difference_graph);
-    Model {
-        _window,
-        road_lines,
-    }
-}
-
-fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
-    match event {
-        KeyPressed(_key) => {}
-        KeyReleased(_key) => {}
-        MouseMoved(_pos) => {}
-        MousePressed(_button) => {}
-        MouseReleased(_button) => {}
-        MouseEntered => {}
-        MouseExited => {}
-        MouseWheel(_amount, _phase) => {}
-        Moved(_pos) => {}
-        Resized(_size) => {}
-        Touch(_touch) => {}
-        TouchPressure(_pressure) => {}
-        HoveredFile(_path) => {}
-        DroppedFile(_path) => {}
-        HoveredFileCancelled => {}
-        Focused => {}
-        Unfocused => {}
-        Closed => {}
-    }
+    println!("graph built");
+    road_graph
 }
 
 /**
-Nannou runs this many times per second to create each frame.
+Reads file and gets data necessary for building our road graph. (all OSM nodes and ways marked with the "highway" tag).
+
+OSM Nodes have a NodeId, coordinates, and tags. OSM Ways are lists of NodeIds with associated tags. These "Ways" indicate roads, building perimeters, etc.
 */
-fn view(app: &App, model: &Model, frame: Frame) -> Frame {
-    let _win = app.window_rect();
-    // Prepare to draw.
-    let draw = app.draw();
+fn get_nodes_and_ways_from_map_data(filename: &str) -> (HashMap<NodeId,Node>,Vec<Way>) {
+    let osm_file = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
+    let mut pbf = osmpbfreader::OsmPbfReader::new(osm_file);
 
-    for road_line in model.road_lines.iter() {
-        draw.line()
-            .points(road_line.start, road_line.end)
-            .thickness(road_line.thickness) // at some point draw according to geographical size ?
-            .hsva(road_line.hue, road_line.saturation, 1.0, road_line.alpha);
+    let mut nodes = HashMap::new();
+    let mut all_roads: Vec<Way> = Vec::new();
+
+    // READING MAP DATA
+    for obj in pbf.par_iter().map(Result::unwrap) {
+        match obj {
+            osmpbfreader::OsmObj::Node(node) => {
+                if is_in_outer_bounds(&node) {
+                    nodes.insert(node.id, node);
+                }
+            }
+            osmpbfreader::OsmObj::Way(way) => {
+                if way.tags.contains_key("highway") {
+                    all_roads.push(way);
+                }
+            }
+            osmpbfreader::OsmObj::Relation(_rel) => {}
+        }
     }
-
-    draw.background().hsv(0.73, 0.55, 0.06);
-    // Write to the window frame.
-    draw.to_frame(app, &frame).unwrap();
-    // Return the drawn frame.
-    frame
+    (nodes,all_roads)
 }
 
 fn is_in_bounds(node: &Node) -> bool {
@@ -527,12 +528,6 @@ fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> 
             alpha,
         });
     }
-    // TESTING
-    println!("LINES LINES LINES");
-    for line in road_lines.iter() {
-        println!("s: {:?}, t: {:?}, hue: {}", line.start, line.end, line.hue);
-    }
-    // END TESTING
     road_lines
 }
 
@@ -659,28 +654,6 @@ fn djikstra_float(
                 })
                 .for_each(|edge| edge_dist.push(edge));
         }
-
-        /*
-                println!("transformed graph ****");
-                for edge in g.edge_indices() {
-                    let (start,end) = g.edge_endpoints(edge).unwrap();
-                    let start_weight = g.node_weight(start).unwrap();
-                    let end_weight = g.node_weight(end).unwrap();
-                        println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
-                       // println!("({},{})",start_weight.id.0, end_weight.id.0);
-                    }
-        */
-        // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from all start nodes
-        /* let edges_leaving_start: Vec<EdgeReference<f32,u32>> = start_indices.iter()
-        .flat_map(|&start_ix| g.edges_directed(start_ix,Outgoing))
-        .collect();*/
-        /*let edges_from_start = g.edges_directed(start, Outgoing);
-        edge_dist = edges_from_start
-            .map(|edge| DistFloat {
-                node: edge.target(),
-                dist: OrderedFloat(*edge.weight()),
-            })
-            .collect();*/
 
         // traverse graph, adding one node at a time (choose the one with the lowest accumulated path distance)
         while !edge_dist.is_empty() {
@@ -931,9 +904,9 @@ enum IntersectionType {
 }
 
 /**
-Finds index of graph node that has the given osm_node. If more than one node contains it, this returns the first one found.
+Finds index of node that contains the given value. Panics if the graph doesn't contain that value.
 */
-fn node_ix_with_osm_id(
+fn find_node_ix_given_node_weight(
     osm_node_id: i64,
     g: &Graph<Node, f32, Directed>,
 ) -> Option<NodeIndex> {
@@ -1573,7 +1546,7 @@ mod tests {
     Helper for other tests
     A simple 4 way intersection. Any changes to this should also be made to "clones_fourway()" because they are supposed to represent the same situation, just before and after making the clone graph.
     */
-    pub fn simple_fourway() -> Graph<Node, f32, Directed> {
+    fn simple_fourway() -> Graph<Node, f32, Directed> {
         let center_node: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1629,7 +1602,7 @@ mod tests {
     Helper for other tests
     Creates a modified graph with a 4 way intersection. The edge weights leaving the intersection all have different values, but don'at actually represent the geographical distance (to make it simple).
     */
-    pub fn clones_fourway() -> Graph<Node, f32, Directed> {
+    fn clones_fourway() -> Graph<Node, f32, Directed> {
         let center_node: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1799,10 +1772,6 @@ mod tests {
         let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
         exp_result.add_node(node.clone());
         let result = modify_graph(&orig_graph);
-        println!("RESULT");
-        print_edges(&result);
-        println!("EXP RESULT");
-        print_edges(&exp_result);
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -1839,10 +1808,6 @@ mod tests {
         let orig_graph = simple_fourway();
         let exp_result = clones_fourway();
         let result = modify_graph(&orig_graph);
-        println!("EXP RESULT");
-        print_edges(&exp_result);
-        println!("RESULT");
-        print_edges(&result);
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -1874,7 +1839,7 @@ mod tests {
     /**
     Useful for printing a graph to the console for manually checking the structure of a graph.
     */
-    pub fn print_edges(g: &Graph<Node, f32, Directed>) {
+    fn print_edges(g: &Graph<Node, f32, Directed>) {
         println!(
             "GRAPH EDGES ({} nodes, {} edges)",
             g.node_count(),
@@ -1896,7 +1861,7 @@ mod tests {
         }
     }
 
-    pub fn print_edges_undirected(g: &Graph<Node, Option<f32>, Undirected>) {
+    fn print_edges_undirected(g: &Graph<Node, Option<f32>, Undirected>) {
         println!(
             "GRAPH EDGES ({} nodes, {} edges)",
             g.node_count(),
