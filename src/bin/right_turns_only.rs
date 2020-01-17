@@ -231,35 +231,33 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 fn create_road_graph_from_map_data(filepath: &str) -> Graph<Node, f32, Directed> {
     // get roads as list of nodes (get road data?)
     // can exclude roads just take Vec<Vec<Node>> ?
-    let (nodes, roads) = get_osm_nodes_and_ways_from_map_data(filepath);
-    let roads = exclude_roads_not_in_bounds(&nodes, &roads);
+    let roads = read_road_data_from_map_file(filepath);
+    let roads = exclude_roads_not_in_bounds(&roads);
     build_road_graph(roads)
 }
 
-fn get_osm_nodes_and_ways_from_map_data(filepath: &str) -> (HashMap<NodeId, Node>, Vec<Way>) {
-    let r = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
-    let mut pbf = osmpbfreader::OsmPbfReader::new(r);
+fn read_road_data_from_map_file(filepath: &str) -> Vec<Vec<Node>> {
+    let file = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
+    let mut osm_file_reader = osmpbfreader::OsmPbfReader::new(file);
+    let mut nodes = HashMap::new(); // associates OSM NodeIds with OSM Nodes
+    let mut ways: Vec<Way> = Vec::new();// OSM data stores roads as Way objects, which are lists of Node IDs
 
-    let mut nodes = HashMap::new();
-    let mut all_roads: Vec<Way> = Vec::new();
-
-    // READING MAP DATA
-    for obj in pbf.par_iter().map(Result::unwrap) {
+    for obj in osm_file_reader.par_iter().map(Result::unwrap) {
         match obj {
             osmpbfreader::OsmObj::Node(node) => {
-                if is_in_outer_bounds(&node) {
                     nodes.insert(node.id, node);
-                }
             }
             osmpbfreader::OsmObj::Way(way) => {
                 if way.tags.contains_key("highway") {
-                    all_roads.push(way);
+                    ways.push(way);
                 }
             }
             osmpbfreader::OsmObj::Relation(_rel) => {}
         }
     }
-    (nodes, all_roads)
+
+    // it's cumbersome to deal with Way objects and hashmap associating the NodeIDs with Nodes, so I just convert every way into Vec<Node> and forget NodeIDs
+    convert_ways_into_node_vecs(&nodes,&ways)
 }
 
 fn convert_ways_into_node_vecs(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Vec<Node>> {
@@ -277,10 +275,9 @@ fn convert_ways_into_node_vecs(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) 
 /**
 Takes the list of Ways and then returns a new list with only those Ways that have at least one node in bounds.
 */
-fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Vec<Node>> {
-    let new_roads = convert_ways_into_node_vecs(&nodes,&roads);
+fn exclude_roads_not_in_bounds(roads: &Vec<Vec<Node>>) -> Vec<Vec<Node>> {
     let mut roads_in_bounds: Vec<Vec<Node>> = Vec::new();
-    for road in new_roads.iter() {
+    for road in roads.iter() {
         let any_in_bounds = road.iter().any(|node|
                 is_in_bounds(node)
         );
@@ -293,7 +290,6 @@ fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) 
 }
 
 fn build_road_graph(roads: Vec<Vec<Node>>) -> Graph<Node, f32, Directed> {
-
     let mut graph_node_indices = HashMap::new();
     let mut road_graph = Graph::<Node, f32, Directed>::new();
     for road in &roads {
