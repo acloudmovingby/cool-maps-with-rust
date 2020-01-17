@@ -233,7 +233,7 @@ fn create_road_graph_from_map_data(filepath: &str) -> Graph<Node, f32, Directed>
     // can exclude roads just take Vec<Vec<Node>> ?
     let (nodes, roads) = get_osm_nodes_and_ways_from_map_data(filepath);
     let roads = exclude_roads_not_in_bounds(&nodes, &roads);
-    build_road_graph(nodes, roads)
+    build_road_graph(roads)
 }
 
 fn get_osm_nodes_and_ways_from_map_data(filepath: &str) -> (HashMap<NodeId, Node>, Vec<Way>) {
@@ -277,17 +277,13 @@ fn convert_ways_into_node_vecs(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) 
 /**
 Takes the list of Ways and then returns a new list with only those Ways that have at least one node in bounds.
 */
-fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Way> {
-    let mut roads_in_bounds: Vec<Way> = Vec::new();
-    for road in roads.iter() {
-        let any_in_bounds = road.nodes.iter().any(|node_id| {
-            if nodes.contains_key(node_id) {
-                let node = nodes.get(node_id).unwrap();
+fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Vec<Node>> {
+    let new_roads = convert_ways_into_node_vecs(&nodes,&roads);
+    let mut roads_in_bounds: Vec<Vec<Node>> = Vec::new();
+    for road in new_roads.iter() {
+        let any_in_bounds = road.iter().any(|node|
                 is_in_bounds(node)
-            } else {
-                false
-            }
-        });
+        );
         // if any of the nodes in the road are in bounds, then keep the road for the graph
         if any_in_bounds {
             roads_in_bounds.push(road.clone());
@@ -296,15 +292,13 @@ fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) 
     roads_in_bounds
 }
 
-fn build_road_graph(nodes: HashMap<NodeId, Node>, roads: Vec<Way>) -> Graph<Node, f32, Directed> {
-    let new_roads = convert_ways_into_node_vecs(&nodes,&roads);
+fn build_road_graph(roads: Vec<Vec<Node>>) -> Graph<Node, f32, Directed> {
+
     let mut graph_node_indices = HashMap::new();
     let mut road_graph = Graph::<Node, f32, Directed>::new();
     for road in &roads {
         let mut prior_node_index = NodeIndex::new(0);
-        for (i, node_id) in road.nodes.iter().enumerate() {
-            // look up node using id
-            let node = nodes.get(node_id).unwrap();
+        for (i, node) in road.iter().enumerate() {
             let cur_node_index: NodeIndex;
             if graph_node_indices.contains_key(node) {
                 cur_node_index = *graph_node_indices.get(node).unwrap();
