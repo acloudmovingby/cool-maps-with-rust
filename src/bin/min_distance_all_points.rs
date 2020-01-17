@@ -228,38 +228,6 @@ fn model(app: &App) -> Model {
         }
     }
 
-    // TESTING
-    let mut num_zero = 0;
-    let mut num_one = 0;
-    let mut num_two = 0;
-    let mut num_three = 0;
-    let mut num_four = 0;
-    let mut num_five = 0;
-    let mut num_sixplus = 0;
-    let mut num_t = 0;
-    for node_ix in road_graph.node_indices() {
-        match road_graph.neighbors(node_ix).count() {
-            0 => num_zero+=1,
-            1 => num_one+=1,
-            2 => num_two+=1,
-            3 => {
-                num_three+=1;
-                let center = road_graph.node_weight(node_ix).unwrap();
-                let mut angles = Vec::new();
-                for neighbor in road_graph.neighbors(node_ix) {
-                    let angle = return_angle(&center, &road_graph.node_weight(neighbor).unwrap());
-                    angles.push(angle);
-                }
-                println!("angle:{}", biggest_angle_gap(angles));
-            },
-            4 => num_four+=1,
-            5 => num_five+=1,
-            _ => num_sixplus+=1
-        }
-    }
-    println!("0:{}, 1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6+:{}", num_zero, num_one, num_two, num_three, num_four, num_five, num_sixplus);
-    // TESTING
-
     let road_lines: Vec<Line> = color_roads(&road_graph);
 
     Model {

@@ -156,22 +156,20 @@ fn model(app: &App) -> Model {
 
     let filepath = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
                                                                                      //let filepath = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    let road_graph = create_road_graph_from_map_data(filepath);
-
-    let modified_graph = modify_graph(&road_graph);
+    let orig_road_graph = create_road_graph_from_map_data(filepath);
+    let turn_based_graph = create_turn_based_graph(&orig_road_graph);
 
     let start_osm_id = 201383067;
-    // find min dist from starting point to ever
-    let orig_start_node_ix = node_ix_with_osm_id(start_osm_id, &road_graph).unwrap();
+    let orig_start_node_ix = node_ix_with_osm_id(start_osm_id, &orig_road_graph).unwrap();
 
-    let orig_min_dist_to_nodes = djikstra_float(&road_graph, orig_start_node_ix);
+    let orig_min_dist_to_nodes = djikstra_float(&orig_road_graph, orig_start_node_ix);
 
-    let modified_start_node_ix = node_ix_with_osm_id(start_osm_id, &modified_graph).unwrap();
-    let modified_min_dist_to_nodes = djikstra_float(&modified_graph, modified_start_node_ix);
+    let modified_start_node_ix = node_ix_with_osm_id(start_osm_id, &turn_based_graph).unwrap();
+    let modified_min_dist_to_nodes = djikstra_float(&turn_based_graph, modified_start_node_ix);
 
     // now make graphs where the edges themselves represent the min distances. (it takes the min distance to each endpoint and averages them--graph with clones it takes whichever clone endpoints have the smallest average)
-    let orig_min_dist = simplify_graph(&road_graph, &orig_min_dist_to_nodes);
-    let modified_min_dist = simplify_graph(&modified_graph, &modified_min_dist_to_nodes);
+    let orig_min_dist = simplify_graph(&orig_road_graph, &orig_min_dist_to_nodes);
+    let modified_min_dist = simplify_graph(&turn_based_graph, &modified_min_dist_to_nodes);
     // subtract difference between original and modified graphs
     let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
 
@@ -229,23 +227,24 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 }
 
 fn create_road_graph_from_map_data(filepath: &str) -> Graph<Node, f32, Directed> {
-    // get roads as list of nodes (get road data?)
-    // can exclude roads just take Vec<Vec<Node>> ?
     let roads = read_road_data_from_map_file(filepath);
     let roads = exclude_roads_not_in_bounds(&roads);
     build_road_graph(roads)
 }
 
+/**
+Reads the OSM PBF file using osmpbfreader crate, and returns lists of "roads" (which are lists of OSM Node objects).
+*/
 fn read_road_data_from_map_file(filepath: &str) -> Vec<Vec<Node>> {
     let file = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
     let mut osm_file_reader = osmpbfreader::OsmPbfReader::new(file);
     let mut nodes = HashMap::new(); // associates OSM NodeIds with OSM Nodes
-    let mut ways: Vec<Way> = Vec::new();// OSM data stores roads as Way objects, which are lists of Node IDs
+    let mut ways: Vec<Way> = Vec::new(); // OSM data stores roads as Way objects, which are lists of Node IDs
 
     for obj in osm_file_reader.par_iter().map(Result::unwrap) {
         match obj {
             osmpbfreader::OsmObj::Node(node) => {
-                    nodes.insert(node.id, node);
+                nodes.insert(node.id, node);
             }
             osmpbfreader::OsmObj::Way(way) => {
                 if way.tags.contains_key("highway") {
@@ -255,11 +254,12 @@ fn read_road_data_from_map_file(filepath: &str) -> Vec<Vec<Node>> {
             osmpbfreader::OsmObj::Relation(_rel) => {}
         }
     }
-
-    // it's cumbersome to deal with Way objects and hashmap associating the NodeIDs with Nodes, so I just convert every way into Vec<Node> and forget NodeIDs
-    convert_ways_into_node_vecs(&nodes,&ways)
+    convert_ways_into_node_vecs(&nodes, &ways)
 }
 
+/**
+OSM Way objects only store lists of NodeIds, not the Node objects themselves, so to simplify things this function converts all Way objects into lists of Node objects (so you don't need to keep passing around a hashmap associating NodeIds with Nodes)
+*/
 fn convert_ways_into_node_vecs(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Vec<Node>> {
     roads
         .iter()
@@ -278,9 +278,7 @@ Takes the list of Ways and then returns a new list with only those Ways that hav
 fn exclude_roads_not_in_bounds(roads: &Vec<Vec<Node>>) -> Vec<Vec<Node>> {
     let mut roads_in_bounds: Vec<Vec<Node>> = Vec::new();
     for road in roads.iter() {
-        let any_in_bounds = road.iter().any(|node|
-                is_in_bounds(node)
-        );
+        let any_in_bounds = road.iter().any(|node| is_in_bounds(node));
         // if any of the nodes in the road are in bounds, then keep the road for the graph
         if any_in_bounds {
             roads_in_bounds.push(road.clone());
@@ -305,23 +303,12 @@ fn build_road_graph(roads: Vec<Vec<Node>>) -> Graph<Node, f32, Directed> {
 
             // if it's not the first one, form an edge along the path
             if i != 0 {
-                // find distances between the two points
                 let prior_node = road_graph
                     .node_weight(prior_node_index)
                     .expect("prior node should exist because we already traversed it");
-                let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
-                let end_point = pt2(node.lon() as f32, node.lat() as f32);
-
-                road_graph.add_edge(
-                    prior_node_index,
-                    cur_node_index,
-                    dist(start_point, end_point),
-                );
-                road_graph.add_edge(
-                    cur_node_index,
-                    prior_node_index,
-                    dist(start_point, end_point),
-                );
+                let dist = dist_between_osm_nodes(&node, &prior_node);
+                road_graph.add_edge(prior_node_index, cur_node_index, dist);
+                road_graph.add_edge(cur_node_index, prior_node_index, dist);
             }
             prior_node_index = cur_node_index;
         }
@@ -348,7 +335,12 @@ fn is_in_outer_bounds(node: &Node) -> bool {
         & (node.lat() > outer_min_lat)
 }
 
-fn dist(pt1: Point2, pt2: Point2) -> f32 {
+/**
+Given OSM Nodes, finds the geographical distance between (Pythagorean theorem).
+*/
+fn dist_between_osm_nodes(node1: &Node, node2: &Node) -> f32 {
+    let pt1 = pt2(node1.lon() as f32, node1.lat() as f32);
+    let pt2 = pt2(node2.lon() as f32, node2.lat() as f32);
     ((pt1.x - pt2.x).powi(2) + (pt1.y - pt2.y).powi(2)).sqrt()
 }
 
@@ -736,7 +728,7 @@ fn djikstra_float(
     }
 }
 
-fn modify_graph(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
+fn create_turn_based_graph(g: &Graph<Node, f32, Directed>) -> Graph<Node, f32, Directed> {
     let mut clone_lists = identify_intersection_type(&g);
     let mut new_g = add_edges_external_to_intersection(&g, &mut clone_lists);
     add_internal_interesection_edges(&g, &mut new_g, clone_lists);
@@ -1793,7 +1785,7 @@ mod tests {
 
         // test empty graph
         let mut orig_graph: Graph<Node, f32, Directed> = Graph::new();
-        let result = modify_graph(&orig_graph);
+        let result = create_turn_based_graph(&orig_graph);
         assert!(is_isomorphic_matching(
             &orig_graph,
             &result,
@@ -1811,7 +1803,7 @@ mod tests {
         orig_graph.add_node(node.clone());
         let mut exp_result: Graph<Node, f32, Directed> = Graph::new();
         exp_result.add_node(node.clone());
-        let result = modify_graph(&orig_graph);
+        let result = create_turn_based_graph(&orig_graph);
         println!("RESULT");
         print_edges(&result);
         println!("EXP RESULT");
@@ -1832,7 +1824,7 @@ mod tests {
 
         let orig_graph = simple_two_nodes();
         let exp_result = clones_two_nodes();
-        let result = modify_graph(&orig_graph);
+        let result = create_turn_based_graph(&orig_graph);
         print_edges(&exp_result);
         print_edges(&result);
         assert!(is_isomorphic_matching(
@@ -1851,7 +1843,7 @@ mod tests {
 
         let orig_graph = simple_fourway();
         let exp_result = clones_fourway();
-        let result = modify_graph(&orig_graph);
+        let result = create_turn_based_graph(&orig_graph);
         println!("EXP RESULT");
         print_edges(&exp_result);
         println!("RESULT");
