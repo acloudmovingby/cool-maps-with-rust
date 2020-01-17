@@ -175,8 +175,6 @@ fn model(app: &App) -> Model {
     // subtract difference between original and modified graphs
     let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
 
-    print_edges_undirected(&difference_graph);
-
     // convert into Lines for easy nannou drawing
     let road_lines = make_lines_for_nannou(&difference_graph);
     Model {
@@ -231,59 +229,14 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 }
 
 fn create_road_graph_from_map_data(filepath: &str) -> Graph<Node, f32, Directed> {
-    let (nodes,roads) = get_osm_nodes_and_ways_from_map_data(filepath);
-    let roads = exclude_roads_not_in_bounds(&nodes,&roads);
-
-    // BUILD GRAPH
-    // make hashmap of node ids to node indices
-    // before adding a node, check to see if it exists
-    // when you add an edge, use node index from hashmap
-    let mut graph_node_indices = HashMap::new();
-    let mut road_graph = Graph::<Node, f32, Directed>::new();
-    for road in &roads {
-        let mut prior_node_index = NodeIndex::new(0);
-        for (i, node_id) in road.nodes.iter().enumerate() {
-            // look up node using id
-            if let Some(node) = nodes.get(node_id) {
-                let cur_node_index: NodeIndex;
-                if graph_node_indices.contains_key(node) {
-                    cur_node_index = *graph_node_indices.get(node).unwrap();
-                } else {
-                    cur_node_index = road_graph.add_node(node.clone());
-                    graph_node_indices.insert(node, cur_node_index);
-                }
-
-                // if it's not the first one, form an edge along the path
-                if i != 0 {
-                    // find distances between the two points
-                    let prior_node = road_graph
-                        .node_weight(prior_node_index)
-                        .expect("prior node should exist because we already traversed it");
-                    let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
-                    let end_point = pt2(node.lon() as f32, node.lat() as f32);
-
-                    // for any of those nodes, print the edge that is being added, so i can be sure it's adding those edges and no more
-                    // for each node then, I should see two edges and those edge should be to the correct other points
-
-                    road_graph.add_edge(
-                        prior_node_index,
-                        cur_node_index,
-                        dist(start_point, end_point),
-                    );
-                    road_graph.add_edge(
-                        cur_node_index,
-                        prior_node_index,
-                        dist(start_point, end_point),
-                    );
-                }
-                prior_node_index = cur_node_index;
-            }
-        }
-    }
-    road_graph
+    // get roads as list of nodes (get road data?)
+    // can exclude roads just take Vec<Vec<Node>> ?
+    let (nodes, roads) = get_osm_nodes_and_ways_from_map_data(filepath);
+    let roads = exclude_roads_not_in_bounds(&nodes, &roads);
+    build_road_graph(nodes, roads)
 }
 
-fn get_osm_nodes_and_ways_from_map_data(filepath: &str) -> (HashMap<NodeId,Node>, Vec<Way>) {
+fn get_osm_nodes_and_ways_from_map_data(filepath: &str) -> (HashMap<NodeId, Node>, Vec<Way>) {
     let r = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
     let mut pbf = osmpbfreader::OsmPbfReader::new(r);
 
@@ -306,13 +259,25 @@ fn get_osm_nodes_and_ways_from_map_data(filepath: &str) -> (HashMap<NodeId,Node>
             osmpbfreader::OsmObj::Relation(_rel) => {}
         }
     }
-    (nodes,all_roads)
+    (nodes, all_roads)
+}
+
+fn convert_ways_into_node_vecs(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Vec<Node>> {
+    roads
+        .iter()
+        .map(|way| {
+            way.nodes
+                .iter()
+                .map(|node_id| nodes.get(node_id).unwrap().clone())
+                .collect()
+        })
+        .collect()
 }
 
 /**
 Takes the list of Ways and then returns a new list with only those Ways that have at least one node in bounds.
 */
-fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId,Node>, roads: &Vec<Way>) -> Vec<Way> {
+fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId, Node>, roads: &Vec<Way>) -> Vec<Way> {
     let mut roads_in_bounds: Vec<Way> = Vec::new();
     for road in roads.iter() {
         let any_in_bounds = road.nodes.iter().any(|node_id| {
@@ -329,6 +294,49 @@ fn exclude_roads_not_in_bounds(nodes: &HashMap<NodeId,Node>, roads: &Vec<Way>) -
         }
     }
     roads_in_bounds
+}
+
+fn build_road_graph(nodes: HashMap<NodeId, Node>, roads: Vec<Way>) -> Graph<Node, f32, Directed> {
+    let new_roads = convert_ways_into_node_vecs(&nodes,&roads);
+    let mut graph_node_indices = HashMap::new();
+    let mut road_graph = Graph::<Node, f32, Directed>::new();
+    for road in &roads {
+        let mut prior_node_index = NodeIndex::new(0);
+        for (i, node_id) in road.nodes.iter().enumerate() {
+            // look up node using id
+            let node = nodes.get(node_id).unwrap();
+            let cur_node_index: NodeIndex;
+            if graph_node_indices.contains_key(node) {
+                cur_node_index = *graph_node_indices.get(node).unwrap();
+            } else {
+                cur_node_index = road_graph.add_node(node.clone());
+                graph_node_indices.insert(node, cur_node_index);
+            }
+
+            // if it's not the first one, form an edge along the path
+            if i != 0 {
+                // find distances between the two points
+                let prior_node = road_graph
+                    .node_weight(prior_node_index)
+                    .expect("prior node should exist because we already traversed it");
+                let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
+                let end_point = pt2(node.lon() as f32, node.lat() as f32);
+
+                road_graph.add_edge(
+                    prior_node_index,
+                    cur_node_index,
+                    dist(start_point, end_point),
+                );
+                road_graph.add_edge(
+                    cur_node_index,
+                    prior_node_index,
+                    dist(start_point, end_point),
+                );
+            }
+            prior_node_index = cur_node_index;
+        }
+    }
+    road_graph
 }
 
 fn is_in_bounds(node: &Node) -> bool {
@@ -526,9 +534,13 @@ fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> 
         // FIND WEIGHT AS INT
         let weight = (edge.weight.unwrap_or(0.0) * 10000.0) as u32; // make an integer so you can use % operator
                                                                     // TRANSFORM WEIGHT INTO HUE (0.0-1.0)
-        let hue = if weight != 0 {map_range(weight, 0, max_weight, HUE_MIN, HUE_MAX)} else {0.0};
+        let hue = if weight != 0 {
+            map_range(weight, 0, max_weight, HUE_MIN, HUE_MAX)
+        } else {
+            0.0
+        };
         // TRANSFORM INTO SATURATION (0.0-1.0)
-        let saturation =  map_range(weight, 0, max_weight /*/ sat_cycles+1*/, 0.5, 1.0);
+        let saturation = map_range(weight, 0, max_weight /*/ sat_cycles+1*/, 0.5, 1.0);
         let thickness = 3.0;
         let alpha = 1.0;
 
@@ -947,10 +959,7 @@ enum IntersectionType {
 /**
 Finds index of graph node that has the given osm_node. If more than one node contains it, this returns the first one found.
 */
-fn node_ix_with_osm_id(
-    osm_node_id: i64,
-    g: &Graph<Node, f32, Directed>,
-) -> Option<NodeIndex> {
+fn node_ix_with_osm_id(osm_node_id: i64, g: &Graph<Node, f32, Directed>) -> Option<NodeIndex> {
     g.node_indices()
         .find(|&node_ix| osm_node_id == g.node_weight(node_ix).unwrap().id.0)
 }
