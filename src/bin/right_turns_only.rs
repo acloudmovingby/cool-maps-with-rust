@@ -93,7 +93,6 @@ fn model(app: &App) -> Model {
         road_lines,
     }
 }
-// look at nannou project structure
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     match event {
@@ -294,6 +293,7 @@ fn edge_difference(
 }
 
 fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> {
+
     let mut road_lines: Vec<Line> = Vec::new();
     let max_weight = g
         .edge_indices()
@@ -330,72 +330,6 @@ fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> 
             saturation,
             alpha,
         });
-    }
-    // TESTING
-    println!("LINES LINES LINES");
-    for line in road_lines.iter() {
-        println!("s: {:?}, t: {:?}, hue: {}", line.start, line.end, line.hue);
-    }
-    // END TESTING
-    road_lines
-}
-
-fn color_roads(road_graph: &Graph<Node, f32, Directed>, test_node: NodeIndex) -> Vec<Line> {
-    let node_indices: Vec<NodeIndex> = road_graph.node_indices().collect();
-    let num_nodes = node_indices.len();
-    let mut rng = rand::thread_rng();
-    let rand1 = rng.gen_range(0, num_nodes);
-    let start: NodeIndex = road_graph.node_indices().nth(rand1).unwrap();
-    let start = test_node; // TESTING
-
-    let min_dist = djikstra_float(&road_graph, start);
-    let max_weight = min_dist
-        .values()
-        .filter(|dist| dist.is_some())
-        .map(|float_dist| (float_dist.unwrap() * 10000.) as u32)
-        .max()
-        .unwrap();
-
-    let num_hue_cycles = 2; // number of times the hue range cycles through before reaching the farthest point.
-    let sat_cycles = 10; // number of times saturation cycles through before reaching the farthest point
-    let mut road_lines: Vec<Line> = Vec::new();
-    for edge in road_graph.raw_edges() {
-        let source = road_graph
-            .node_weight(edge.source())
-            .map(|node| convert_coord(node));
-        let target = road_graph
-            .node_weight(edge.target())
-            .map(|node| convert_coord(node));
-
-        // modify min_dist so it only stores one of the 4 clone nodes
-        if source.is_some() && target.is_some() {
-            // find weight (which is the f32 path distance from the "start" node to the source node of this edge)
-            let weight = min_dist.get(&edge.target()).unwrap();
-            // MAKES COLORS ROTATE CYCLICALLY
-            let weight = (weight.unwrap_or(0.0) * 10000.0) as u32; // make an integer so you can use % operator
-            let weight_hue = weight % (max_weight / num_hue_cycles);
-            // TRANSFORM WEIGHT INTO HUE (0.0-1.0) / THICKNESS (1.0+) VALUES
-            let hue = map_range(weight_hue, 0, max_weight / num_hue_cycles, HUE_MIN, HUE_MAX);
-
-            // MAKE SATURATION ROTATE CYCLICALLY
-            let weight = weight % (max_weight / sat_cycles); // make saturation cycle faster than hue
-            let saturation = map_range(weight, 0, max_weight / sat_cycles, 0.5, 1.0);
-            //let saturation = 1.0; // if you want no change/cycling of saturation
-
-            // if you want thickness to vary by path distance from start:
-            //let thickness = map_range(weight, 0, max_weight, 3.5, 1.0);
-            let thickness = 1.0;
-            let alpha = 1.0;
-
-            road_lines.push(Line {
-                start: source.unwrap(),
-                end: target.unwrap(),
-                thickness,
-                hue,
-                saturation,
-                alpha,
-            });
-        }
     }
     road_lines
 }
