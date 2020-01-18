@@ -87,3 +87,10 @@ const MAX_LON: f64 = -71.39901;
 const MIN_LON: f64 = -71.40392;
 const MAX_LAT: f64 = 41.82546;
 const MIN_LAT: f64 = 41.82323;*/
+
+// South of Brown University
+// (corner of Gano and Wickenden: 201383067)
+const MAX_LON: f64 = -71.3748;
+const MIN_LON: f64 = -71.4125;
+const MAX_LAT: f64 = 41.8308;
+const MIN_LAT: f64 = 41.8148;

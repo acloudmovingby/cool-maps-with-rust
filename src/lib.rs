@@ -1,9 +1,20 @@
 pub mod config {
+    pub struct Config {
+        pub map_bounds: MapBounds,
+        pub window_dimensions: WindowDimensions,
+        pub map_file_path: String
+    }
+
     pub struct MapBounds {
         pub max_lon: f64,
         pub min_lon: f64,
         pub max_lat: f64,
         pub min_lat: f64
+    }
+
+    pub struct WindowDimensions {
+        pub width: f32,
+        pub height: f32
     }
 }
 
@@ -13,11 +24,11 @@ pub mod read_map_data {
     use petgraph::graph::*;
     use nannou::prelude::*;
     use std::collections::HashMap;
-    use crate::config::MapBounds;
+    use crate::config::{MapBounds,Config};
 
-    pub fn road_graph_from_map_data(filepath: &str, map_bounds: &MapBounds) -> Graph<Node, f32, Directed> {
-        let roads = read_road_data_from_map_file(filepath);
-        let roads = exclude_roads_not_in_bounds(&roads, map_bounds);
+    pub fn road_graph_from_map_data(config: &Config) -> Graph<Node, f32, Directed> {
+        let roads = read_road_data_from_map_file(&config.map_file_path);
+        let roads = exclude_roads_not_in_bounds(&roads, &config.map_bounds);
         build_road_graph(roads)
     }
 
@@ -114,7 +125,7 @@ Takes the list of Ways and then returns a new list with only those Ways that hav
 
 
     /**
-Given OSM Nodes, finds the geographical distance between (Pythagorean theorem).
+Given OSM Nodes, finds the geographical distance between them (Pythagorean theorem).
 */
     fn dist_between_osm_nodes(node1: &Node, node2: &Node) -> f32 {
         let pt1 = pt2(node1.lon() as f32, node1.lat() as f32);

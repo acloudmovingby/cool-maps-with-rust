@@ -1,9 +1,9 @@
-use map_project::read_map_data::road_graph_from_map_data;
-use map_project::config::MapBounds;
 use crate::tests::clones_fourway;
 use crate::tests::print_edges;
 use crate::tests::print_edges_undirected;
 use crate::tests::simple_fourway;
+use map_project::config::{MapBounds, WindowDimensions, Config};
+use map_project::read_map_data::road_graph_from_map_data;
 use nannou::draw::properties::Vertices;
 use nannou::prelude::*;
 use ordered_float::OrderedFloat;
@@ -22,16 +22,14 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-// South of Brown University
-// (corner of Gano and Wickenden: 201383067)
+const LEFT_TURN_PENALTY: f32 = 10000.0;
+const RIGHT_TURN_PENALTY: f32 = 0.0;
+const STRAIGHT_PENALTY: f32 = 0.0;
+
 const MAX_LON: f64 = -71.3748;
 const MIN_LON: f64 = -71.4125;
 const MAX_LAT: f64 = 41.8308;
 const MIN_LAT: f64 = 41.8148;
-
-const LEFT_TURN_PENALTY: f32 = 10000.0;
-const RIGHT_TURN_PENALTY: f32 = 0.0;
-const STRAIGHT_PENALTY: f32 = 0.0;
 
 const LON_RANGE: f64 = MAX_LON - MIN_LON;
 const LAT_RANGE: f64 = MAX_LAT - MIN_LAT;
@@ -58,18 +56,16 @@ struct Model {
 Builds the model (the data to display for nannou)
 */
 fn model(app: &App) -> Model {
+    let config = setup_config();
     let _window = app
         .new_window()
-        .with_dimensions(WIN_W as u32, WIN_H as u32)
+        .with_dimensions(config.window_dimensions.width as u32, config.window_dimensions.height as u32)
         .view(view)
         .event(window_event)
         .build()
         .unwrap();
 
-    let filepath = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-                                                                                     //let filepath = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    let map_bounds = MapBounds{max_lon:-71.3748, min_lon:-71.4125, max_lat: 41.8308, min_lat:41.8148};
-    let orig_road_graph = road_graph_from_map_data(filepath, &map_bounds);
+    let orig_road_graph = road_graph_from_map_data(&config);
     let turn_based_graph = create_turn_based_graph(&orig_road_graph);
 
     let start_osm_id = 201383067;
@@ -86,8 +82,8 @@ fn model(app: &App) -> Model {
     // subtract difference between original and modified graphs
     let difference_graph = edge_difference(&modified_min_dist, &orig_min_dist);
 
-    // convert into Lines for easy nannou drawing
-    let road_lines = make_lines_for_nannou(&difference_graph);
+    // convert into Lines so all values are ready for drawing in the nannou view function
+    let road_lines = make_lines_for_nannou(&difference_graph, &config);
     Model {
         _window,
         road_lines,
@@ -128,7 +124,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     for road_line in model.road_lines.iter() {
         draw.line()
             .points(road_line.start, road_line.end)
-            .thickness(road_line.thickness) // at some point draw according to geographical size ?
+            .thickness(road_line.thickness)
             .hsva(road_line.hue, road_line.saturation, 1.0, road_line.alpha);
     }
 
@@ -139,9 +135,34 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     frame
 }
 
-fn convert_coord(node: &Node) -> Point2 {
-    let x = map_range(node.lon(), MIN_LON, MAX_LON, -WIN_W * 0.5, WIN_W * 0.5);
-    let y = map_range(node.lat(), MIN_LAT, MAX_LAT, -WIN_W * 0.5, WIN_H * 0.5);
+fn setup_config() -> Config {
+    let map_bounds = MapBounds {
+        max_lon: -71.3748,
+        min_lon: -71.4125,
+        max_lat: 41.8308,
+        min_lat: 41.8148,
+    };
+    let window_dimensions = WindowDimensions{width: WIN_W, height: WIN_H};
+    let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
+    //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+    Config{map_bounds, window_dimensions, map_file_path}
+}
+
+fn convert_coord(node: &Node, config: &Config) -> Point2 {
+    let x = map_range(
+        node.lon(),
+        config.map_bounds.min_lon,
+        config.map_bounds.max_lon,
+        -config.window_dimensions.width * 0.5,
+        config.window_dimensions.width * 0.5,
+    );
+    let y = map_range(
+        node.lat(),
+        config.map_bounds.min_lat,
+        config.map_bounds.max_lat,
+        -config.window_dimensions.width * 0.5,
+        config.window_dimensions.height * 0.5,
+    );
     pt2(x, y)
 }
 
@@ -292,14 +313,16 @@ fn edge_difference(
     ret_graph
 }
 
-fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> {
-
+fn make_lines_for_nannou(
+    g: &Graph<Node, Option<f32>, Undirected>,
+    config: &Config,
+) -> Vec<Line> {
     let mut road_lines: Vec<Line> = Vec::new();
     let max_weight = g
         .edge_indices()
         .map(|edge_ix| g.edge_weight(edge_ix).unwrap())
         .filter(|e_weight| e_weight.is_some())
-        .map(|weight| (weight.unwrap() * 10000.) as u32) // avoids using float, we know range of longitude/latitude coordinates isn't more than 180.0 (?)
+        .map(|weight| (weight.unwrap() * 10000.) as u32) // avoids using float, we know range of longitude/latitude coordinates isn't more than 180.0
         .max()
         .unwrap();
 
@@ -307,8 +330,8 @@ fn make_lines_for_nannou(g: &Graph<Node, Option<f32>, Undirected>) -> Vec<Line> 
     let sat_cycles = 10; // number of times saturation cycles through before reaching the farthest point
     let mut road_lines: Vec<Line> = Vec::new();
     for edge in g.raw_edges() {
-        let source = convert_coord(g.node_weight(edge.source()).unwrap());
-        let target = convert_coord(g.node_weight(edge.target()).unwrap());
+        let source = convert_coord(g.node_weight(edge.source()).unwrap(), config);
+        let target = convert_coord(g.node_weight(edge.target()).unwrap(), config);
         // FIND WEIGHT AS INT
         let weight = (edge.weight.unwrap_or(0.0) * 10000.0) as u32; // make an integer so you can use % operator
                                                                     // TRANSFORM WEIGHT INTO HUE (0.0-1.0)
