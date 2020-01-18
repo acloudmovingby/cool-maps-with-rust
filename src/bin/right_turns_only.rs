@@ -1,4 +1,5 @@
 use map_project::read_map_data::road_graph_from_map_data;
+use map_project::config::MapBounds;
 use crate::tests::clones_fourway;
 use crate::tests::print_edges;
 use crate::tests::print_edges_undirected;
@@ -20,96 +21,6 @@ use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::collections::HashSet;
-
-// AROUND MY HOUSE
-/*
-const MAX_LON: f64 = -71.10030;
-const MIN_LON: f64 = -71.11010;
-const MAX_LAT: f64 = 42.39705;
-const MIN_LAT: f64 = 42.39263;*/
-
-// DOWNTOWN BOSTON + CAMBRIDGE
-/*
-const MAX_LON: f64 = -71.0479;
-const MIN_LON: f64 = -71.0871;
-const MAX_LAT: f64 = 42.3704;
-const MIN_LAT: f64 = 42.3527;*/
-
-// NAHANT
-/*
-const MAX_LON: f64 = -70.8440;
-const MIN_LON: f64 = -71.0009;
-const MAX_LAT: f64 = 42.4808;
-const MIN_LAT: f64 = 42.4070;*/
-
-// NEWPORT / JAMESTOWN, RI
-/*
-const MAX_LON: f64 = -71.1856;
-const MIN_LON: f64 = -71.4994;
-const MAX_LAT: f64 = 41.5756;
-const MIN_LAT: f64 = 41.4257;*/
-
-// Near NEWPORT RI
-/*
-const MAX_LON: f64 = -71.3048;
-const MIN_LON: f64 = -71.4133;
-const MAX_LAT: f64 = 41.5108;
-const MIN_LAT: f64 = 41.4749;*/
-
-// PROVIDENCE DOWNTOWN
-/*
-const MAX_LON: f64 = -71.3919;
-const MIN_LON: f64 = -71.4311;
-const MAX_LAT: f64 = 41.8300;
-const MIN_LAT: f64 = 41.8122;*/
-
-// LARGER PROVIDENCE AREA
-/*
-const MAX_LON: f64 = -71.2202;
-const MIN_LON: f64 = -71.5340;
-const MAX_LAT: f64 = 41.8831;
-const MIN_LAT: f64 = 41.7403;*/
-
-/*
-const MAX_LON: f64 = -71.36522;
-const MIN_LON: f64 = -71.38602;
-const MAX_LAT: f64 = 41.53705;
-const MIN_LAT: f64 = 41.52632;*/
-
-//Small part of Jamestown, RI
-/*
-const MAX_LON: f64 = -71.3621;
-const MIN_LON: f64 = -71.3820;
-const MAX_LAT: f64 = 41.5028;
-const MIN_LAT: f64 = 41.4938;*/
-
-// VERY small part of Jamestown, RI
-// (osm node id at intersection of Canonicus Ave and Park Avenue: 201128095
-/*
-const MAX_LON: f64 = -71.36557;
-const MIN_LON: f64 = -71.37553;
-const MAX_LAT: f64 = 41.50079;
-const MIN_LAT: f64 = 41.49631;*/
-
-// random part or RI
-/*
-const MAX_LON: f64 = -71.2896;
-const MIN_LON: f64 = -71.3095;
-const MAX_LAT: f64 = 41.5251;
-const MIN_LAT: f64 = 41.5162;*/
-
-//Brown University
-/*const MAX_LON: f64 = -71.3909;
-const MIN_LON: f64 = -71.4105;
-const MAX_LAT: f64 = 41.8282;
-const MIN_LAT: f64 = 41.8192;*/
-
-// Brown Frat squad
-/*
-const MAX_LON: f64 = -71.39901;
-const MIN_LON: f64 = -71.40392;
-const MAX_LAT: f64 = 41.82546;
-const MIN_LAT: f64 = 41.82323;*/
 
 // South of Brown University
 // (corner of Gano and Wickenden: 201383067)
@@ -157,7 +68,8 @@ fn model(app: &App) -> Model {
 
     let filepath = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
                                                                                      //let filepath = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    let orig_road_graph = road_graph_from_map_data(filepath);
+    let map_bounds = MapBounds{max_lon:-71.3748, min_lon:-71.4125, max_lat: 41.8308, min_lat:41.8148};
+    let orig_road_graph = road_graph_from_map_data(filepath, &map_bounds);
     let turn_based_graph = create_turn_based_graph(&orig_road_graph);
 
     let start_osm_id = 201383067;

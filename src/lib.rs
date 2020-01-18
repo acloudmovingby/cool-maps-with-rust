@@ -15,10 +15,9 @@ pub mod read_map_data {
     use std::collections::HashMap;
     use crate::config::MapBounds;
 
-    pub fn road_graph_from_map_data(filepath: &str) -> Graph<Node, f32, Directed> {
-        let map_bounds = MapBounds{max_lon:-71.3748, min_lon:-71.4125, max_lat: 41.8308, min_lat:41.8148};
+    pub fn road_graph_from_map_data(filepath: &str, map_bounds: &MapBounds) -> Graph<Node, f32, Directed> {
         let roads = read_road_data_from_map_file(filepath);
-        let roads = exclude_roads_not_in_bounds(&roads, &map_bounds);
+        let roads = exclude_roads_not_in_bounds(&roads, map_bounds);
         build_road_graph(roads)
     }
 
@@ -123,3 +122,4 @@ Given OSM Nodes, finds the geographical distance between (Pythagorean theorem).
         ((pt1.x - pt2.x).powi(2) + (pt1.y - pt2.y).powi(2)).sqrt()
     }
 }
+
