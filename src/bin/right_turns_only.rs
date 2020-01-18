@@ -1,3 +1,4 @@
+use map_project::read_map_data::road_graph_from_map_data;
 use crate::tests::clones_fourway;
 use crate::tests::print_edges;
 use crate::tests::print_edges_undirected;
@@ -156,7 +157,7 @@ fn model(app: &App) -> Model {
 
     let filepath = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
                                                                                      //let filepath = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    let orig_road_graph = create_road_graph_from_map_data(filepath);
+    let orig_road_graph = road_graph_from_map_data(filepath);
     let turn_based_graph = create_turn_based_graph(&orig_road_graph);
 
     let start_osm_id = 201383067;
@@ -180,6 +181,7 @@ fn model(app: &App) -> Model {
         road_lines,
     }
 }
+// look at nannou project structure
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     match event {
