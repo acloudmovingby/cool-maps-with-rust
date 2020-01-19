@@ -26,20 +26,6 @@ const LEFT_TURN_PENALTY: f32 = 10000.0;
 const RIGHT_TURN_PENALTY: f32 = 0.0;
 const STRAIGHT_PENALTY: f32 = 0.0;
 
-const MAX_LON: f64 = -71.3748;
-const MIN_LON: f64 = -71.4125;
-const MAX_LAT: f64 = 41.8308;
-const MIN_LAT: f64 = 41.8148;
-
-const LON_RANGE: f64 = MAX_LON - MIN_LON;
-const LAT_RANGE: f64 = MAX_LAT - MIN_LAT;
-
-const MAX_WIN_WIDTH: f32 = 1357.0 * 0.7; // based on my laptop screen
-const MAX_WIN_HEIGHT: f32 = 657.0 * 0.7; // based on my laptop screen
-
-const WIN_W: f32 = ((MAX_WIN_HEIGHT as f64) / LAT_RANGE * LON_RANGE) as f32;
-const WIN_H: f32 = MAX_WIN_HEIGHT;
-
 const HUE_MAX: f32 = 0.9; // the nannou API for hsv colors takes an f32 between 0.0 and 1.0
 const HUE_MIN: f32 = 0.55;
 
@@ -137,18 +123,24 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
 
 fn setup_config() -> Config {
     let map_bounds = MapBounds {
-        max_lon: -71.3748,
-        min_lon: -71.4125,
-        max_lat: 41.8308,
+        max_lon: -71.3889,
+        min_lon: -71.4122,
+        max_lat: 41.8320,
         min_lat: 41.8148,
     };
-    let window_dimensions = WindowDimensions{width: WIN_W, height: WIN_H};
+    let lon_to_lat_ratio = ((map_bounds.max_lon-map_bounds.min_lon)/(map_bounds.max_lat-map_bounds.min_lat)) as f32;
+    let max_win_height = 657.0;
+    let window_dimensions = WindowDimensions{width: lon_to_lat_ratio*max_win_height, height: max_win_height};
     let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
     //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
     Config{map_bounds, window_dimensions, map_file_path}
 }
 
+/**
+Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel value to feed to the nannou drawing functions.
+*/
 fn convert_coord(node: &Node, config: &Config) -> Point2 {
+    // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right
     let x = map_range(
         node.lon(),
         config.map_bounds.min_lon,
@@ -160,7 +152,7 @@ fn convert_coord(node: &Node, config: &Config) -> Point2 {
         node.lat(),
         config.map_bounds.min_lat,
         config.map_bounds.max_lat,
-        -config.window_dimensions.width * 0.5,
+        -config.window_dimensions.height * 0.5,
         config.window_dimensions.height * 0.5,
     );
     pt2(x, y)
