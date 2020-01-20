@@ -4,14 +4,14 @@ use petgraph::graph::*;
 use petgraph::prelude::*;
 use map_project::read_map_data::read_buildings_from_map_data;
 use map_project::read_map_data::road_graph_from_map_data;
-use map_project::config::{Config,MapBounds,WindowDimensions};
-use map_project::nannou_conversions::{convert_coord, batch_convert_coord, Line};
+use map_project::config::{MapConfigData, MapBounds, WindowDimensions};
+use map_project::nannou_conversions::{convert_coord, batch_convert_coord, Line, Polygon};
 
 fn main() {
     nannou::app(model).run();
 }
 
-fn setup_config() -> Config {
+fn setup_config() -> MapConfigData {
     let map_bounds = MapBounds {
         max_lon: -71.3919,
         min_lon: -71.4311,
@@ -21,7 +21,7 @@ fn setup_config() -> Config {
     let window_dimensions = calculate_window_dimensions(657.0,&map_bounds);
     let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string(); // RI
     //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf".to_string(); // MA
-    Config{map_bounds, window_dimensions, map_file_path}
+    MapConfigData {map_bounds, window_dimensions, map_file_path}
 }
 
 fn calculate_window_dimensions(max_win_height: f32, map_bounds: &MapBounds) -> WindowDimensions {
@@ -31,7 +31,7 @@ fn calculate_window_dimensions(max_win_height: f32, map_bounds: &MapBounds) -> W
 
 struct Model {
     _window: window::Id,
-    buildings: Vec<Vec<Point2>>, // each Vec represents a closed path of points describing the perimeter of the building
+    buildings: Vec<Polygon>, // each Vec represents a closed path of points describing the perimeter of the building
     road_lines: Vec<Line>,       // Line stores start, end, hue, saturation, alpha, thickness
 }
 
@@ -52,6 +52,7 @@ fn model(app: &App) -> Model {
     let road_lines: Vec<Line> = color_roads(&road_graph, &config);
     let buildings = read_buildings_from_map_data(&config);
     let buildings: Vec<Vec<Point2>> = batch_convert_coord(&buildings, &config);
+    let buildings: Vec<Polygon> = convert_to_polygon_objs(&buildings);
 
     Model {
         _window,
@@ -90,13 +91,17 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     let _win = app.window_rect();
     let draw = app.draw();
 
+    for building_polygon in model.buildings.iter() {
+        draw.polygon().points(building_polygon.points.clone()).hsv(building_polygon.hue, building_polygon.saturation, building_polygon.value);
+    }
+    /*
     for building in &model.buildings {
         let mut points: Vec<Point2> = Vec::new();
         for node in building {
             points.push(node.clone());
         }
         draw.polygon().points(points).hsv(0.6, 0.7, 0.5);
-    }
+    }*/
 
     for road_line in model.road_lines.iter() {
         draw.line()
@@ -147,7 +152,7 @@ fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> 
 /**
 Given the road graph, it transforms it into Lines to be fed to the nannou drawing functions
 */
-fn color_roads(road_graph: &Graph<Node, f32, Directed>, config: &Config) -> Vec<Line> {
+fn color_roads(road_graph: &Graph<Node, f32, Directed>, config: &MapConfigData) -> Vec<Line> {
     let mut road_lines = Vec::new();
     for edge in road_graph.raw_edges() {
         let source = road_graph
@@ -171,3 +176,13 @@ fn color_roads(road_graph: &Graph<Node, f32, Directed>, config: &Config) -> Vec<
     road_lines
 }
 
+fn convert_to_polygon_objs(node_lists: &Vec<Vec<Point2>>) -> Vec<Polygon> {
+    node_lists.iter()
+        .map(|points| Polygon{
+            points: points.clone(),
+            hue: 0.6,
+            saturation: 0.7,
+            value: 0.5
+        })
+        .collect()
+}

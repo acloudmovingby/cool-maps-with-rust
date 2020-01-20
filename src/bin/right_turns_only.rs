@@ -2,7 +2,7 @@ use crate::tests::clones_fourway;
 use crate::tests::print_edges;
 use crate::tests::print_edges_undirected;
 use crate::tests::simple_fourway;
-use map_project::config::{MapBounds, WindowDimensions, Config};
+use map_project::config::{MapBounds, WindowDimensions, MapConfigData};
 use map_project::read_map_data::road_graph_from_map_data;
 use map_project::nannou_conversions::*;
 use nannou::draw::properties::Vertices;
@@ -122,7 +122,7 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
     frame
 }
 
-fn setup_config() -> Config {
+fn setup_config() -> MapConfigData {
     let map_bounds = MapBounds {
         max_lon: -71.3889,
         min_lon: -71.4122,
@@ -132,7 +132,7 @@ fn setup_config() -> Config {
     let window_dimensions = calculate_window_dimensions(657.0, &map_bounds);
     let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
     //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-    Config{map_bounds, window_dimensions, map_file_path}
+    MapConfigData {map_bounds, window_dimensions, map_file_path}
 }
 
 fn calculate_window_dimensions(max_win_height: f32, map_bounds: &MapBounds) -> WindowDimensions {
@@ -289,7 +289,7 @@ fn edge_difference(
 
 fn make_lines_for_nannou(
     g: &Graph<Node, Option<f32>, Undirected>,
-    config: &Config,
+    config: &MapConfigData,
 ) -> Vec<Line> {
     let mut road_lines: Vec<Line> = Vec::new();
     let max_weight = g

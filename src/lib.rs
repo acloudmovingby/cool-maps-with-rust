@@ -2,7 +2,7 @@ pub mod config {
     /**
     Data necessary for configuring how to draw the maps (these are used by all the binaries in map_project)
     */
-    pub struct Config {
+    pub struct MapConfigData {
         pub map_bounds: MapBounds,
         pub window_dimensions: WindowDimensions,
         pub map_file_path: String
@@ -27,15 +27,15 @@ pub mod read_map_data {
     use petgraph::graph::*;
     use nannou::prelude::*;
     use std::collections::HashMap;
-    use crate::config::{MapBounds,Config};
+    use crate::config::{MapBounds, MapConfigData};
     use std::collections::hash_map::RandomState;
 
-    pub fn read_buildings_from_map_data(config: &Config) -> Vec<Vec<Node>> {
+    pub fn read_buildings_from_map_data(config: &MapConfigData) -> Vec<Vec<Node>> {
         let buildings = get_ways_from_map_file("building", &config.map_file_path);
         exclude_not_in_bounds(&buildings, &config.map_bounds)
     }
 
-    pub fn road_graph_from_map_data(config: &Config) -> Graph<Node, f32, Directed> {
+    pub fn road_graph_from_map_data(config: &MapConfigData) -> Graph<Node, f32, Directed> {
         let roads = get_ways_from_map_file("highway", &config.map_file_path);
         let roads = exclude_not_in_bounds(&roads, &config.map_bounds);
         build_road_graph(roads)
@@ -144,14 +144,14 @@ Given OSM Nodes, finds the geographical distance between them (Pythagorean theor
 Responsible for useful functions to interact with the nannou API
 */
 pub mod nannou_conversions {
-    use crate::config::{MapBounds,Config};
+    use crate::config::{MapBounds, MapConfigData};
     use nannou::prelude::*;
     use osmpbfreader::Node;
 
     /**
 Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into a pixel coordinate to feed to the nannou drawing functions.
 */
-    pub fn convert_coord(node: &Node, config: &Config) -> Point2 {
+    pub fn convert_coord(node: &Node, config: &MapConfigData) -> Point2 {
         // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right
         let x = map_range(
             node.lon(),
@@ -173,7 +173,7 @@ Converts the geographical coordinates of an OSM node (its longitudue/latitude) a
     /**
     Same as convert_coord above, just for a list of lists of nodes (where each list of nodes represents some Way from the OSM data, like a building perimeter or a road).
     */
-    pub fn batch_convert_coord(nodes: &Vec<Vec<Node>>, config: &Config) -> Vec<Vec<Point2>> {
+    pub fn batch_convert_coord(nodes: &Vec<Vec<Node>>, config: &MapConfigData) -> Vec<Vec<Point2>> {
         nodes.iter()
             .map(|node_list| node_list.iter()
                 .map(|node| convert_coord(node, &config))
@@ -193,5 +193,10 @@ Stores the data I want to use when I draw a line using nannou's draw.line() buil
         pub alpha: f32,
     }
 
-
+    pub struct Polygon {
+        pub points: Vec<Point2>,
+        pub hue: f32,
+        pub saturation: f32,
+        pub value: f32
+    }
 }
