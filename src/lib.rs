@@ -166,4 +166,12 @@ Converts the geographical coordinates of an OSM node (its longitudue/latitude) a
         );
         pt2(x, y)
     }
+
+    pub fn batch_convert_coord(nodes: &Vec<Vec<Node>>, config: &Config) -> Vec<Vec<Point2>> {
+        nodes.iter()
+            .map(|node_list| node_list.iter()
+                .map(|node| convert_coord(node, &config))
+                .collect())
+            .collect()
+    }
 }

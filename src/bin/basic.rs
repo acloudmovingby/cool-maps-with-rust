@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use map_project::read_map_data::read_buildings_from_map_data;
 use map_project::read_map_data::road_graph_from_map_data;
 use map_project::config::{Config,MapBounds,WindowDimensions};
-use map_project::nannou_conversions::convert_coord;
+use map_project::nannou_conversions::{convert_coord, batch_convert_coord};
 
 // AROUND MY HOUSE
 /*
@@ -134,50 +134,10 @@ fn model(app: &App) -> Model {
         .build()
         .unwrap();
 
-    let filename = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf"; // RI
-                                                                                     //let filename = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-
-    let r = std::fs::File::open(&std::path::Path::new(filename)).unwrap();
-    let mut pbf = osmpbfreader::OsmPbfReader::new(r);
-
-    let mut nodes = HashMap::new();
-    let mut building_node_ids: Vec<Vec<NodeId>> = Vec::new();
-    let mut all_roads: Vec<Way> = Vec::new();
-
-    // READING MAP DATA
-    for obj in pbf.par_iter().map(Result::unwrap) {
-        match obj {
-            osmpbfreader::OsmObj::Node(node) => {
-                if is_in_outer_bounds(&node) {
-                    nodes.insert(node.id, node);
-                }
-            }
-            osmpbfreader::OsmObj::Way(way) => {
-                if way.tags.contains_key("building") {
-                    building_node_ids.push(way.nodes);
-                } else if way.tags.contains_key("highway") {
-                    all_roads.push(way);
-                }
-            }
-            osmpbfreader::OsmObj::Relation(_rel) => {}
-        }
-    }
-
-    let buildings: Vec<Vec<Point2>> = node_ids_to_pts(building_node_ids, &nodes);
-    //let building_paths: Vec<Vec<Point2>> = level_of_detail(1.0, building_paths); // if you want to make buildings simpler so it renders faster
-
-
-
     let road_graph = road_graph_from_map_data(&config);
     let road_lines: Vec<Line> = color_roads(&road_graph, &config);
-    let buildings2 = read_buildings_from_map_data(&config);
-    let buildings: Vec<Vec<Point2>> = buildings2.into_iter()
-        .map(|node_list| node_list.iter()
-            .map(|node| convert_coord(node, &config))
-            .collect())
-        .collect();
-
-
+    let buildings = read_buildings_from_map_data(&config);
+    let buildings: Vec<Vec<Point2>> = batch_convert_coord(&buildings, &config);
 
     Model {
         _window,
@@ -186,9 +146,6 @@ fn model(app: &App) -> Model {
     }
 }
 
-/**
-Just
-*/
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(_key) => {}
