@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use map_project::nannou_conversions::Line;
 
 // AROUND MY HOUSE
 /*
@@ -387,16 +388,6 @@ fn color_roads(road_graph: &Graph<Node, f32, Directed>) -> Vec<Line> {
         }
     }
     road_lines
-}
-
-// stores the data I want to use when I draw a line using nannou's draw.line() builder, namely the end points and values for the color/thickness
-struct Line {
-    start: Point2<f32>,
-    end: Point2<f32>,
-    thickness: f32,
-    hue: f32,
-    saturation: f32,
-    alpha: f32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

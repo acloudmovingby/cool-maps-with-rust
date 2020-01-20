@@ -1,4 +1,7 @@
 pub mod config {
+    /**
+    Data necessary for configuring how to draw the maps (these are used by all the binaries in map_project)
+    */
     pub struct Config {
         pub map_bounds: MapBounds,
         pub window_dimensions: WindowDimensions,
@@ -146,7 +149,7 @@ pub mod nannou_conversions {
     use osmpbfreader::Node;
 
     /**
-Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel location to feed to the nannou drawing functions.
+Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into a pixel coordinate to feed to the nannou drawing functions.
 */
     pub fn convert_coord(node: &Node, config: &Config) -> Point2 {
         // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right
@@ -167,6 +170,9 @@ Converts the geographical coordinates of an OSM node (its longitudue/latitude) a
         pt2(x, y)
     }
 
+    /**
+    Same as convert_coord above, just for a list of lists of nodes (where each list of nodes represents some Way from the OSM data, like a building perimeter or a road).
+    */
     pub fn batch_convert_coord(nodes: &Vec<Vec<Node>>, config: &Config) -> Vec<Vec<Point2>> {
         nodes.iter()
             .map(|node_list| node_list.iter()
@@ -174,4 +180,18 @@ Converts the geographical coordinates of an OSM node (its longitudue/latitude) a
                 .collect())
             .collect()
     }
+
+    /**
+Stores the data I want to use when I draw a line using nannou's draw.line() builder, namely the end points and values for the color, thickness, etc. This ensures that these values are all ready to go and there's no unnecessary calculations being formed in the nannou view function (which is called many times per second to build the frames)
+*/
+    pub struct Line {
+        pub start: Point2<f32>,
+        pub end: Point2<f32>,
+        pub thickness: f32,
+        pub hue: f32,
+        pub saturation: f32,
+        pub alpha: f32,
+    }
+
+
 }

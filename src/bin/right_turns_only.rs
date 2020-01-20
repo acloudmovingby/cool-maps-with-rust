@@ -129,12 +129,15 @@ fn setup_config() -> Config {
         max_lat: 41.8320,
         min_lat: 41.8148,
     };
-    let lon_to_lat_ratio = ((map_bounds.max_lon-map_bounds.min_lon)/(map_bounds.max_lat-map_bounds.min_lat)) as f32;
-    let max_win_height = 657.0;
-    let window_dimensions = WindowDimensions{width: lon_to_lat_ratio*max_win_height, height: max_win_height};
+    let window_dimensions = calculate_window_dimensions(657.0, &map_bounds);
     let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
     //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
     Config{map_bounds, window_dimensions, map_file_path}
+}
+
+fn calculate_window_dimensions(max_win_height: f32, map_bounds: &MapBounds) -> WindowDimensions {
+    let lon_to_lat_ratio = ((map_bounds.max_lon-map_bounds.min_lon)/(map_bounds.max_lat-map_bounds.min_lat)) as f32;
+    WindowDimensions{width: lon_to_lat_ratio*max_win_height, height: max_win_height}
 }
 
 /**
@@ -326,16 +329,6 @@ fn make_lines_for_nannou(
         });
     }
     road_lines
-}
-
-// compactly stores the data to use for the nannou's draw.line() builder, so no need to recompute things when rendering
-struct Line {
-    start: Point2<f32>,
-    end: Point2<f32>,
-    thickness: f32,
-    hue: f32,
-    saturation: f32,
-    alpha: f32,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
