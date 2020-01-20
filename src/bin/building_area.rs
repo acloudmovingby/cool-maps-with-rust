@@ -3,9 +3,6 @@ use map_project::config::*;
 use map_project::read_map_data::read_buildings_from_map_data;
 use nannou::prelude::*;
 use ordered_float::OrderedFloat;
-use osmpbfreader::{Node, NodeId};
-use std::collections::hash_map::RandomState;
-use std::collections::HashMap;
 use std::time::Instant;
 
 const HUE_MAX: f32 = 0.55; // the nannou API for hsv colors takes an f32 between 0.0 and 1.0
@@ -157,9 +154,9 @@ fn polygon_area(points: &[Point2<f32>]) -> f32 {
     }
 }
 
-fn calculate_building_areas(buildings: &Vec<Vec<Point2>>) -> Vec<(Vec<Point2>, f32)> {
+fn calculate_building_areas(buildings: &[Vec<Point2>]) -> Vec<(Vec<Point2>, f32)> {
     buildings
-        .into_iter()
+        .iter()
         .map(|points| {
             let area = polygon_area(&points).min(500.0);
             (points.clone(), area)
@@ -167,7 +164,7 @@ fn calculate_building_areas(buildings: &Vec<Vec<Point2>>) -> Vec<(Vec<Point2>, f
         .collect()
 }
 
-fn calculate_building_hues(buildings: &Vec<(Vec<Point2>, f32)>) -> Vec<(Vec<Point2>, f32)> {
+fn calculate_building_hues(buildings: &[(Vec<Point2>, f32)]) -> Vec<(Vec<Point2>, f32)> {
     let min_area = buildings
         .iter()
         .map(|(_pts, area)| OrderedFloat(*area))
@@ -183,14 +180,13 @@ fn calculate_building_hues(buildings: &Vec<(Vec<Point2>, f32)>) -> Vec<(Vec<Poin
     buildings
         .iter()
         .map(|(pts, area)| {
-            let foo = pts.clone();
             let hue = map_range(*area, min_area, max_area, HUE_MIN, HUE_MAX);
             (pts.clone(), hue)
         })
         .collect()
 }
 
-fn convert_to_polygons(buildings: &Vec<(Vec<Point2>, f32)>) -> Vec<Polygon> {
+fn convert_to_polygons(buildings: &[(Vec<Point2>, f32)]) -> Vec<Polygon> {
     buildings
         .iter()
         .map(|(points, hue)| Polygon {
