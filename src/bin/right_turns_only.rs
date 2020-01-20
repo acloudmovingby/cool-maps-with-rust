@@ -4,6 +4,7 @@ use crate::tests::print_edges_undirected;
 use crate::tests::simple_fourway;
 use map_project::config::{MapBounds, WindowDimensions, Config};
 use map_project::read_map_data::road_graph_from_map_data;
+use map_project::nannou_conversions::*;
 use nannou::draw::properties::Vertices;
 use nannou::prelude::*;
 use ordered_float::OrderedFloat;
@@ -134,28 +135,6 @@ fn setup_config() -> Config {
     let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
     //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
     Config{map_bounds, window_dimensions, map_file_path}
-}
-
-/**
-Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel value to feed to the nannou drawing functions.
-*/
-fn convert_coord(node: &Node, config: &Config) -> Point2 {
-    // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right
-    let x = map_range(
-        node.lon(),
-        config.map_bounds.min_lon,
-        config.map_bounds.max_lon,
-        -config.window_dimensions.width * 0.5,
-        config.window_dimensions.width * 0.5,
-    );
-    let y = map_range(
-        node.lat(),
-        config.map_bounds.min_lat,
-        config.map_bounds.max_lat,
-        -config.window_dimensions.height * 0.5,
-        config.window_dimensions.height * 0.5,
-    );
-    pt2(x, y)
 }
 
 /**

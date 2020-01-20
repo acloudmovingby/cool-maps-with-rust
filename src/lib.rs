@@ -25,6 +25,31 @@ pub mod read_map_data {
     use nannou::prelude::*;
     use std::collections::HashMap;
     use crate::config::{MapBounds,Config};
+    use std::collections::hash_map::RandomState;
+
+
+    // TODO: make generic function that just reads ways (generally) and only takes a string for the tag (this function here is almost identical to the one that reads road ways below)
+    pub fn read_buildings_from_map_data(filepath: &str) -> Vec<Vec<Node>> {
+        let file = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
+        let mut osm_file_reader = osmpbfreader::OsmPbfReader::new(file);
+        let mut building_ways = Vec::new();
+        let mut nodes = HashMap::new(); // associates OSM NodeIds with OSM Nodes
+
+        for obj in osm_file_reader.par_iter().map(Result::unwrap) {
+            match obj {
+                osmpbfreader::OsmObj::Node(node) => {
+                    nodes.insert(node.id, node);
+                }
+                osmpbfreader::OsmObj::Way(way) => {
+                    if way.tags.contains_key("building") {
+                        building_ways.push(way);
+                    }
+                }
+                osmpbfreader::OsmObj::Relation(_rel) => {}
+            }
+        }
+        convert_ways_into_node_vecs(&nodes, &building_ways)
+    }
 
     pub fn road_graph_from_map_data(config: &Config) -> Graph<Node, f32, Directed> {
         let roads = read_road_data_from_map_file(&config.map_file_path);
@@ -134,3 +159,33 @@ Given OSM Nodes, finds the geographical distance between them (Pythagorean theor
     }
 }
 
+/**
+Responsible for useful functions to interact with the nannou API
+*/
+pub mod nannou_conversions {
+    use crate::config::{MapBounds,Config};
+    use nannou::prelude::*;
+    use osmpbfreader::Node;
+
+    /**
+Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel value to feed to the nannou drawing functions.
+*/
+    pub fn convert_coord(node: &Node, config: &Config) -> Point2 {
+        // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right
+        let x = map_range(
+            node.lon(),
+            config.map_bounds.min_lon,
+            config.map_bounds.max_lon,
+            -config.window_dimensions.width * 0.5,
+            config.window_dimensions.width * 0.5,
+        );
+        let y = map_range(
+            node.lat(),
+            config.map_bounds.min_lat,
+            config.map_bounds.max_lat,
+            -config.window_dimensions.height * 0.5,
+            config.window_dimensions.height * 0.5,
+        );
+        pt2(x, y)
+    }
+}

@@ -5,6 +5,8 @@ use petgraph::graph::*;
 use petgraph::prelude::*;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
+use map_project::read_map_data::read_buildings_from_map_data;
+use map_project::config::{Config,MapBounds,WindowDimensions};
 
 // AROUND MY HOUSE
 /*
@@ -93,6 +95,27 @@ fn main() {
     nannou::app(model).run();
 }
 
+fn setup_config() -> Config {
+    let map_bounds = MapBounds {
+        max_lon: -71.3919,
+        min_lon: -71.4311,
+        max_lat: 41.8300,
+        min_lat: 41.8122,
+    };
+
+    let window_dimensions = calculate_window_dimensions(657.0,&map_bounds);
+
+    let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
+    //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
+
+    Config{map_bounds, window_dimensions, map_file_path}
+}
+
+fn calculate_window_dimensions(max_win_height: f32, map_bounds: &MapBounds) -> WindowDimensions {
+    let lon_to_lat_ratio = ((map_bounds.max_lon-map_bounds.min_lon)/(map_bounds.max_lat-map_bounds.min_lat)) as f32;
+    WindowDimensions{width: lon_to_lat_ratio*max_win_height, height: max_win_height}
+}
+
 struct Model {
     _window: window::Id,
     buildings: Vec<Vec<Point2>>, // each Vec represents a closed path of points describing the perimeter of the building
@@ -103,9 +126,10 @@ struct Model {
 Sets up the initial state of the program before the nannou UI loop begins.
 */
 fn model(app: &App) -> Model {
+    let config = setup_config();
     let _window = app
         .new_window()
-        .with_dimensions(WIN_W as u32, WIN_H as u32)
+        .with_dimensions(config.window_dimensions.width as u32, config.window_dimensions.height as u32)
         .view(view)
         .event(window_event)
         .build()
@@ -140,10 +164,9 @@ fn model(app: &App) -> Model {
         }
     }
 
-    let building_paths: Vec<Vec<Point2>> = node_ids_to_pts(building_node_ids, &nodes);
+    let buildings: Vec<Vec<Point2>> = node_ids_to_pts(building_node_ids, &nodes);
     //let building_paths: Vec<Vec<Point2>> = level_of_detail(1.0, building_paths); // if you want to make buildings simpler so it renders faster
 
-    let buildings = building_paths;
     // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
     // roads thus represents all the Ways that have at least one node in the map bounds
     let mut roads: Vec<Way> = Vec::new();
@@ -207,6 +230,9 @@ fn model(app: &App) -> Model {
         }
     }
     let road_lines: Vec<Line> = color_roads(&road_graph);
+    let buildings2 = read_buildings_from_map_data(filename);
+    // TODO: create a config at top, change all instances of convert_coord, then change buildings, then change road_graph (in other words, change the constant stuff first before dealing with replacing the read functions)
+
 
     Model {
         _window,
