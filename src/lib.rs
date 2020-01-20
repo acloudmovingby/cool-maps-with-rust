@@ -27,44 +27,22 @@ pub mod read_map_data {
     use crate::config::{MapBounds,Config};
     use std::collections::hash_map::RandomState;
 
-
-    // TODO: make generic function that just reads ways (generally) and only takes a string for the tag (this function here is almost identical to the one that reads road ways below)
-    pub fn read_buildings_from_map_data(filepath: &str) -> Vec<Vec<Node>> {
-        let file = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
-        let mut osm_file_reader = osmpbfreader::OsmPbfReader::new(file);
-        let mut building_ways = Vec::new();
-        let mut nodes = HashMap::new(); // associates OSM NodeIds with OSM Nodes
-
-        for obj in osm_file_reader.par_iter().map(Result::unwrap) {
-            match obj {
-                osmpbfreader::OsmObj::Node(node) => {
-                    nodes.insert(node.id, node);
-                }
-                osmpbfreader::OsmObj::Way(way) => {
-                    if way.tags.contains_key("building") {
-                        building_ways.push(way);
-                    }
-                }
-                osmpbfreader::OsmObj::Relation(_rel) => {}
-            }
-        }
-        convert_ways_into_node_vecs(&nodes, &building_ways)
+    pub fn read_buildings_from_map_data(config: &Config) -> Vec<Vec<Node>> {
+        let buildings = get_ways_from_map_file("building", &config.map_file_path);
+        exclude_not_in_bounds(&buildings, &config.map_bounds)
     }
 
     pub fn road_graph_from_map_data(config: &Config) -> Graph<Node, f32, Directed> {
-        let roads = read_road_data_from_map_file(&config.map_file_path);
-        let roads = exclude_roads_not_in_bounds(&roads, &config.map_bounds);
+        let roads = get_ways_from_map_file("highway", &config.map_file_path);
+        let roads = exclude_not_in_bounds(&roads, &config.map_bounds);
         build_road_graph(roads)
     }
 
-    /**
-Reads the OSM PBF file using osmpbfreader crate, and returns lists of "roads" (which are lists of OSM Node objects).
-*/
-    fn read_road_data_from_map_file(filepath: &str) -> Vec<Vec<Node>> {
-        let file = std::fs::File::open(&std::path::Path::new(filepath)).unwrap();
+    fn get_ways_from_map_file(way_tag: &str, map_file_path:&str) -> Vec<Vec<Node>> {
+        let file = std::fs::File::open(&std::path::Path::new(map_file_path)).unwrap();
         let mut osm_file_reader = osmpbfreader::OsmPbfReader::new(file);
+        let mut ways = Vec::new();
         let mut nodes = HashMap::new(); // associates OSM NodeIds with OSM Nodes
-        let mut ways: Vec<Way> = Vec::new(); // OSM data stores roads as Way objects, which are lists of Node IDs
 
         for obj in osm_file_reader.par_iter().map(Result::unwrap) {
             match obj {
@@ -72,7 +50,7 @@ Reads the OSM PBF file using osmpbfreader crate, and returns lists of "roads" (w
                     nodes.insert(node.id, node);
                 }
                 osmpbfreader::OsmObj::Way(way) => {
-                    if way.tags.contains_key("highway") {
+                    if way.tags.contains_key(way_tag) {
                         ways.push(way);
                     }
                 }
@@ -98,9 +76,9 @@ OSM Way objects only store lists of NodeIds, not the Node objects themselves, so
     }
 
     /**
-Takes the list of Ways and then returns a new list with only those Ways that have at least one node in bounds.
+Takes the list of Ways (buildings, roads, etc.) that have been converted into lists of nodes (Vec<Node>), and then returns only those of them that have at least one node in bounds. (thus excluding all non-visible roads/buildings)
 */
-    fn exclude_roads_not_in_bounds(roads: &Vec<Vec<Node>>, map_bounds: &MapBounds) -> Vec<Vec<Node>> {
+    pub fn exclude_not_in_bounds(roads: &Vec<Vec<Node>>, map_bounds: &MapBounds) -> Vec<Vec<Node>> {
         let mut roads_in_bounds: Vec<Vec<Node>> = Vec::new();
         for road in roads.iter() {
             let any_in_bounds = road.iter().any(|node| is_in_bounds(node, map_bounds));
@@ -168,7 +146,7 @@ pub mod nannou_conversions {
     use osmpbfreader::Node;
 
     /**
-Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel value to feed to the nannou drawing functions.
+Converts the geographical coordinates of an OSM node (its longitudue/latitude) and converts it into pixel location to feed to the nannou drawing functions.
 */
     pub fn convert_coord(node: &Node, config: &Config) -> Point2 {
         // note that nannou draws to the screen with (0,0) is the center of the window, with negatives to the left, positives to the right

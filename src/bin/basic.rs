@@ -6,7 +6,9 @@ use petgraph::prelude::*;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use map_project::read_map_data::read_buildings_from_map_data;
+use map_project::read_map_data::road_graph_from_map_data;
 use map_project::config::{Config,MapBounds,WindowDimensions};
+use map_project::nannou_conversions::convert_coord;
 
 // AROUND MY HOUSE
 /*
@@ -102,12 +104,9 @@ fn setup_config() -> Config {
         max_lat: 41.8300,
         min_lat: 41.8122,
     };
-
     let window_dimensions = calculate_window_dimensions(657.0,&map_bounds);
-
-    let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string();
-    //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf"; // MA
-
+    let map_file_path = "/Users/christopherpoates/Downloads/rhode-island-latest.osm.pbf".to_string(); // RI
+    //let map_file_path = "/Users/christopherpoates/Downloads/massachusetts-latest.osm.pbf".to_string(); // MA
     Config{map_bounds, window_dimensions, map_file_path}
 }
 
@@ -167,71 +166,17 @@ fn model(app: &App) -> Model {
     let buildings: Vec<Vec<Point2>> = node_ids_to_pts(building_node_ids, &nodes);
     //let building_paths: Vec<Vec<Point2>> = level_of_detail(1.0, building_paths); // if you want to make buildings simpler so it renders faster
 
-    // now we take all_roads and remove all Ways that are not in map bounds to make a new collection: roads
-    // roads thus represents all the Ways that have at least one node in the map bounds
-    let mut roads: Vec<Way> = Vec::new();
-    for road in all_roads {
-        let any_in_bounds = road.nodes.iter().any(|node_id| {
-            if nodes.contains_key(node_id) {
-                let node = nodes.get(node_id).unwrap();
-                is_in_bounds(node)
-            } else {
-                false
-            }
-        });
 
-        // if any of the nodes in the road are in bounds, then keep the road for the graph
-        if any_in_bounds {
-            roads.push(road);
-        }
-    }
 
-    // BUILD GRAPH
-    // make hashmap of node ids to node indices
-    // before adding a node, check to see if it exists
-    // when you add an edge, use node index from hashmap
-    let mut graph_node_indices = HashMap::new();
-    let mut road_graph = Graph::<Node, f32, Directed>::new();
-    for road in &roads {
-        let mut prior_node_index = NodeIndex::new(0);
-        for (i, node_id) in road.nodes.iter().enumerate() {
-            // look up node using id
-            if let Some(node) = nodes.get(node_id) {
-                let cur_node_index: NodeIndex;
-                if graph_node_indices.contains_key(node) {
-                    cur_node_index = *graph_node_indices.get(node).unwrap();
-                } else {
-                    cur_node_index = road_graph.add_node(node.clone());
-                    graph_node_indices.insert(node, cur_node_index);
-                }
+    let road_graph = road_graph_from_map_data(&config);
+    let road_lines: Vec<Line> = color_roads(&road_graph, &config);
+    let buildings2 = read_buildings_from_map_data(&config);
+    let buildings: Vec<Vec<Point2>> = buildings2.into_iter()
+        .map(|node_list| node_list.iter()
+            .map(|node| convert_coord(node, &config))
+            .collect())
+        .collect();
 
-                // if it's not the first one, form an edge
-                if i != 0 {
-                    // find distances between the two points
-                    let prior_node = road_graph
-                        .node_weight(prior_node_index)
-                        .expect("prior node should exist because we already traversed it");
-                    let start_point = pt2(prior_node.lon() as f32, prior_node.lat() as f32);
-                    let end_point = pt2(node.lon() as f32, node.lat() as f32);
-
-                    road_graph.add_edge(
-                        prior_node_index,
-                        cur_node_index,
-                        dist(start_point, end_point),
-                    );
-                    road_graph.add_edge(
-                        cur_node_index,
-                        prior_node_index,
-                        dist(start_point, end_point),
-                    );
-                }
-                prior_node_index = cur_node_index;
-            }
-        }
-    }
-    let road_lines: Vec<Line> = color_roads(&road_graph);
-    let buildings2 = read_buildings_from_map_data(filename);
-    // TODO: create a config at top, change all instances of convert_coord, then change buildings, then change road_graph (in other words, change the constant stuff first before dealing with replacing the read functions)
 
 
     Model {
@@ -319,7 +264,7 @@ fn dist(pt1: Point2, pt2: Point2) -> f32 {
     ((pt1.x - pt2.x).powi(2) + (pt1.y - pt2.y).powi(2)).sqrt()
 }
 
-fn convert_coord(node: &Node) -> Point2 {
+fn convert_coord2(node: &Node) -> Point2 {
     let x = map_range(node.lon(), MIN_LON, MAX_LON, -WIN_W * 0.5, WIN_W * 0.5);
     let y = map_range(node.lat(), MIN_LAT, MAX_LAT, -WIN_W * 0.5, WIN_H * 0.5);
     pt2(x, y)
@@ -337,7 +282,7 @@ fn node_ids_to_pts(
                 .into_iter()
                 .map(|x| nodes.get(&x).unwrap())
                 .cloned()
-                .map(|node| convert_coord(&node))
+                .map(|node| convert_coord2(&node))
                 .collect();
             building_paths.push(building_path_as_points);
         }
@@ -379,15 +324,15 @@ fn level_of_detail(min_size: f32, points: Vec<Vec<Point2>>) -> Vec<Vec<Point2>> 
 /**
 In this binary, this function draws the roads as white.
 */
-fn color_roads(road_graph: &Graph<Node, f32, Directed>) -> Vec<Line> {
+fn color_roads(road_graph: &Graph<Node, f32, Directed>, config: &Config) -> Vec<Line> {
     let mut road_lines = Vec::new();
     for edge in road_graph.raw_edges() {
         let source = road_graph
             .node_weight(edge.source())
-            .map(|node| convert_coord(node));
+            .map(|node| convert_coord(node,config));
         let target = road_graph
             .node_weight(edge.target())
-            .map(|node| convert_coord(node));
+            .map(|node| convert_coord(node,config));
 
         if source.is_some() && target.is_some() {
             road_lines.push(Line {
