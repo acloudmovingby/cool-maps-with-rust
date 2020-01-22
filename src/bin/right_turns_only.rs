@@ -180,7 +180,7 @@ fn simplify_graph(
             // compare the edge weight in g with the edge weight in ret_graph, then use the new edge weight if it's lower.
             // if the graph is disconnected, then some nodes might have None value, meaning they're unreachable (so ignore them)
             if min_dist_to_start.is_some() && min_dist_to_end.is_some() {
-                let mut weight = (min_dist_to_start.unwrap() + min_dist_to_end.unwrap()) / 2.0;
+                let weight = (min_dist_to_start.unwrap() + min_dist_to_end.unwrap()) / 2.0;
                 let cur_weight: &mut Option<f32> =
                     ret_graph.edge_weight_mut(ret_graph_edge).unwrap();
                 if cur_weight.is_none() {
@@ -229,8 +229,6 @@ fn edge_difference(
     g1: &Graph<Node, Option<f32>, Undirected>,
     g2: &Graph<Node, Option<f32>, Undirected>,
 ) -> Graph<Node, Option<f32>, Undirected> {
-    // for testing small graphs, can assert isomorphism here, but on real data (with thousands of nodes), this is far too inefficient to run practically
-    // assert!(is_isomorphic(g1, g2));
 
     // build a hashmap associating the OpenStreetMap node id with node indices from the petgraph graph (the OSM id is the actual values stored in the petgraph graph nodes)
     let g1_nodes: HashMap<i64, NodeIndex> = g1
@@ -291,7 +289,7 @@ fn make_lines_for_nannou(
     g: &Graph<Node, Option<f32>, Undirected>,
     config: &MapConfigData,
 ) -> Vec<Line> {
-    let mut road_lines: Vec<Line> = Vec::new();
+    let road_lines: Vec<Line> = Vec::new();
     let max_weight = g
         .edge_indices()
         .map(|edge_ix| g.edge_weight(edge_ix).unwrap())
@@ -384,28 +382,6 @@ fn djikstra_float(
                 })
                 .for_each(|edge| edge_dist.push(edge));
         }
-
-        /*
-                println!("transformed graph ****");
-                for edge in g.edge_indices() {
-                    let (start,end) = g.edge_endpoints(edge).unwrap();
-                    let start_weight = g.node_weight(start).unwrap();
-                    let end_weight = g.node_weight(end).unwrap();
-                        println!("({},{} -> {},{})", start_weight.id.0, start.index(), end_weight.id.0, end.index());
-                       // println!("({},{})",start_weight.id.0, end_weight.id.0);
-                    }
-        */
-        // initialize edge_dist, the priority queue (binary heap), with all outgoing edges from all start nodes
-        /* let edges_leaving_start: Vec<EdgeReference<f32,u32>> = start_indices.iter()
-        .flat_map(|&start_ix| g.edges_directed(start_ix,Outgoing))
-        .collect();*/
-        /*let edges_from_start = g.edges_directed(start, Outgoing);
-        edge_dist = edges_from_start
-            .map(|edge| DistFloat {
-                node: edge.target(),
-                dist: OrderedFloat(*edge.weight()),
-            })
-            .collect();*/
 
         // traverse graph, adding one node at a time (choose the one with the lowest accumulated path distance)
         while !edge_dist.is_empty() {
@@ -678,7 +654,7 @@ mod tests {
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         let exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
         assert!(is_isomorphic_matching(
             &exp_result,
@@ -692,7 +668,7 @@ mod tests {
     fn test_simplify_one_node() {
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
 
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
@@ -732,7 +708,7 @@ mod tests {
     fn test_simplify_two_nodes_disconnected() {
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
 
         let mut test_graph = Graph::<Node, f32, Directed>::new();
         let mut min_dist = HashMap::new();
@@ -806,7 +782,7 @@ mod tests {
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -840,14 +816,14 @@ mod tests {
         let result = simplify_graph(&test_graph, &min_dist);
 
         // build exp_result
-        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
         let n0 = exp_result.add_node(node0.clone());
         let n1 = exp_result.add_node(node1.clone());
-        exp_result.add_edge(n0, n1, 15.0);
+        exp_result.add_edge(n0, n1, Some(15.0));
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -926,16 +902,16 @@ mod tests {
         let result = simplify_graph(&test_graph, &min_dist);
 
         // build exp_result
-        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
         let n1 = exp_result.add_node(node1.clone());
         let n2 = exp_result.add_node(node2.clone());
         let n3 = exp_result.add_node(node3.clone());
-        exp_result.add_edge(n1, n2, 10.0);
-        exp_result.add_edge(n2, n3, std::f32::MAX);
+        exp_result.add_edge(n1, n2, Some(10.0));
+        exp_result.add_edge(n2, n3, Some(std::f32::MAX));
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -969,14 +945,14 @@ mod tests {
         min_dist.insert(clone2, Some(20.0));
         min_dist.insert(clone3, None);
 
-        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
         exp_result.add_node(node1.clone());
 
         let result = simplify_graph(&test_graph, &min_dist);
 
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         assert!(is_isomorphic_matching(
             &exp_result,
             &result,
@@ -1022,21 +998,21 @@ mod tests {
             decimicro_lon: -1,
         };
 
-        let mut exp_result: Graph<Node, f32, Undirected> = Graph::new_undirected();
+        let mut exp_result: Graph<Node, Option<f32>, Undirected> = Graph::new_undirected();
         let c = exp_result.add_node(center_node);
         let w = exp_result.add_node(west_node);
         let n = exp_result.add_node(north_node);
         let e = exp_result.add_node(east_node);
         let s = exp_result.add_node(south_node);
-        exp_result.add_edge(w, c, 4.0 + LEFT_TURN_PENALTY + 1.0 * 0.5);
-        exp_result.add_edge(n, c, 4.0 + STRAIGHT_PENALTY + 2.0 * 0.5);
-        exp_result.add_edge(e, c, 4.0 + RIGHT_TURN_PENALTY + 3.0 * 0.5);
-        exp_result.add_edge(s, c, 4.0 * 0.5);
+        exp_result.add_edge(w, c, Some(4.0 + LEFT_TURN_PENALTY + 1.0 * 0.5));
+        exp_result.add_edge(n, c, Some(4.0 + STRAIGHT_PENALTY + 2.0 * 0.5));
+        exp_result.add_edge(e, c, Some(4.0 + RIGHT_TURN_PENALTY + 3.0 * 0.5));
+        exp_result.add_edge(s, c, Some(4.0 * 0.5));
 
         // test for equality (graph isomorphism)
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
         assert!(is_isomorphic_matching(
             &result,
             &exp_result,
@@ -1048,8 +1024,8 @@ mod tests {
     // TEST DIFFERENCE GRAPH
     #[test]
     fn test_empty_graphs_diff() {
-        let mut g1 = Graph::<Node, f32, Undirected>::new_undirected();
-        let mut g2 = Graph::<Node, f32, Undirected>::new_undirected();
+        let mut g1 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
+        let mut g2 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
         let result = edge_difference(&g1, &g2);
         assert_eq!(result.node_count(), 0);
         assert_eq!(result.edge_count(), 0);
@@ -1057,8 +1033,8 @@ mod tests {
 
     #[test]
     fn test_no_edge_graphs_diff() {
-        let mut g1 = Graph::<Node, f32, Undirected>::new_undirected();
-        let mut g2 = Graph::<Node, f32, Undirected>::new_undirected();
+        let mut g1 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
+        let mut g2 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
         let node0: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1082,8 +1058,8 @@ mod tests {
 
     #[test]
     fn test_one_edge_graphs_diff() {
-        let mut g1 = Graph::<Node, f32, Undirected>::new_undirected();
-        let mut g2 = Graph::<Node, f32, Undirected>::new_undirected();
+        let mut g1 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
+        let mut g2 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
         let node0: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1098,10 +1074,10 @@ mod tests {
         };
         let g1n1 = g1.add_node(node0.clone());
         let g1n2 = g1.add_node(node1.clone());
-        g1.add_edge(g1n1, g1n2, 5.0);
+        g1.add_edge(g1n1, g1n2, Some(5.0));
         let g2n1 = g2.add_node(node0);
         let g2n2 = g2.add_node(node1);
-        g2.add_edge(g2n1, g2n2, 2.0);
+        g2.add_edge(g2n1, g2n2, Some(2.0));
         let result = edge_difference(&g1, &g2);
         assert_eq!(result.node_count(), 2);
         assert_eq!(result.edge_count(), 1);
@@ -1109,15 +1085,15 @@ mod tests {
             *result
                 .edge_weight(result.edge_indices().next().unwrap())
                 .unwrap(),
-            3.0
+            Some(3.0)
         );
     }
 
     #[test]
     fn test_multi_edge_disconnect_diff() {
         // tests case where there are multiple edges as well as disconnected components in the graph
-        let mut g1 = Graph::<Node, f32, Undirected>::new_undirected();
-        let mut g2 = Graph::<Node, f32, Undirected>::new_undirected();
+        let mut g1 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
+        let mut g2 = Graph::<Node, Option<f32>, Undirected>::new_undirected();
         let node0: Node = Node {
             id: NodeId(0),
             tags: Default::default(),
@@ -1146,16 +1122,16 @@ mod tests {
         let g1n1 = g1.add_node(node1.clone());
         let g1n2 = g1.add_node(node2.clone());
         let g1n3 = g1.add_node(node3.clone());
-        g1.add_edge(g1n0, g1n1, 5.0);
-        g1.add_edge(g1n1, g1n2, 15.0);
-        g1.add_edge(g1n2, g1n0, 25.0);
+        g1.add_edge(g1n0, g1n1, Some(5.0));
+        g1.add_edge(g1n1, g1n2, Some(15.0));
+        g1.add_edge(g1n2, g1n0, Some(25.0));
         let g2n0 = g2.add_node(node0);
         let g2n1 = g2.add_node(node1);
         let g2n2 = g2.add_node(node2);
         let g2n3 = g2.add_node(node3);
-        g2.add_edge(g2n0, g2n1, 3.0);
-        g2.add_edge(g2n1, g2n2, 7.0);
-        g2.add_edge(g2n2, g2n0, 21.0);
+        g2.add_edge(g2n0, g2n1, Some(3.0));
+        g2.add_edge(g2n1, g2n2, Some(7.0));
+        g2.add_edge(g2n2, g2n0, Some(21.0));
         let result = edge_difference(&g1, &g2);
         assert_eq!(result.node_count(), 4);
         assert_eq!(result.edge_count(), 3);
@@ -1163,7 +1139,7 @@ mod tests {
             *result
                 .edge_weight(result.edge_indices().next().unwrap())
                 .unwrap(),
-            2.0
+            Some(2.0)
         );
         let exp_edge_weights: HashSet<OrderedFloat<f32>> =
             [OrderedFloat(2.0), OrderedFloat(8.0), OrderedFloat(4.0)]
@@ -1172,7 +1148,7 @@ mod tests {
                 .collect();
         let edge_weights: HashSet<OrderedFloat<f32>, RandomState> = result
             .edge_indices()
-            .map(|e_ix| OrderedFloat(*result.edge_weight(e_ix).unwrap()))
+            .map(|e_ix| OrderedFloat(result.edge_weight(e_ix).unwrap().unwrap()))
             .collect();
         assert_eq!(exp_edge_weights, edge_weights);
     }
@@ -1244,11 +1220,11 @@ mod tests {
     fn test_isomorphic_graph() {
         // these functions used for petgraph::algo::is_isomorphic_matching to test node/edge equality
         let node_match = |n1: &Node, n2: &Node| n1.eq(n2);
-        let edge_match = |e1: &f32, e2: &f32| e1 == e2;
+        let edge_match = |e1: &Option<f32>, e2: &Option<f32>| e1.unwrap() == e2.unwrap();
 
         // test empty graphs
-        let mut g1: Graph<Node, f32, Directed> = Graph::new();
-        let mut g2: Graph<Node, f32, Directed> = Graph::new();
+        let mut g1: Graph<Node, Option<f32>, Directed> = Graph::new();
+        let mut g2: Graph<Node, Option<f32>, Directed> = Graph::new();
         assert!(is_isomorphic_matching(&g1, &g2, node_match, edge_match));
 
         // test simple graphs that are the same
@@ -1264,13 +1240,13 @@ mod tests {
             decimicro_lat: 0,
             decimicro_lon: 0,
         });
-        g1.add_edge(n1, n2, 1.0);
+        g1.add_edge(n1, n2, Some(1.0));
         g2 = g1.clone();
         assert!(is_isomorphic_matching(&g1, &g2, node_match, edge_match));
 
         // test simple graphs that differ by edge weight (but node weights are the same)
         g2.clear_edges();
-        g2.add_edge(n1.clone(), n2.clone(), 2.0); // now edge has 2.0 weight not 1.0
+        g2.add_edge(n1.clone(), n2.clone(), Some(2.0)); // now edge has 2.0 weight not 1.0
         assert!(!is_isomorphic_matching(&g1, &g2, node_match, edge_match));
 
         // test simple graphs that differ by node weight (but edge weights are the same)
@@ -1287,7 +1263,7 @@ mod tests {
             decimicro_lat: 0,
             decimicro_lon: 0,
         });
-        g2.add_edge(n1, n3, 1.0); // edge weight the same but the nodes are different
+        g2.add_edge(n1, n3, Some(1.0)); // edge weight the same but the nodes are different
         assert!(!is_isomorphic_matching(&g1, &g2, node_match, edge_match));
     }
 
