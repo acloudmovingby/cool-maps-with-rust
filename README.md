@@ -29,11 +29,11 @@ CRATES USED
 
 PROBLEMS / ISSUES
 - map data, especially about buildings, wasn't as complete as I had anticipated
-- petgraph builds graphs correctly, but it's pathfinding algorithms (djikstra / bellman-ford) do not work correctly, so I had to write my own versions
-- nannou currently doesn't support framebuffers, so program runs very slowly once I zoom out to a wide view of the map (it tries to redraw all the polygons every 1/60th of a second to the frame, rather than utilizing the fact that many of them don't change)
+- petgraph builds graphs correctly, but it's pathfinding algorithms (djikstra / bellman-ford) either had some bugs or I was misusing them, so I had to write my own versions
+- according to the people who answered me on slack, nannou currently doesn't support framebuffers, so program runs very slowly once I zoom out to a wide view of the map (it tries to redraw all the polygons every 1/60th of a second to the frame, rather than utilizing the fact that many of them don't change)
 
 TO DO
-- learn how to use vulkan directly, so I can implement my own framebuffer
+- learn how to use vulkan directly, so I can implement my own framebuffer?
 - currently I can draw paths in real time from a point to the mouse cursor, but I want to build animated graph on the side of the visualization that shows path distance to various points (e.g. hospital, police station, etc.) in real time as you move the cursor (the bars in the bar graph would bounce up and down as you move the mouse, while different color paths would show path to those buildings)
 
 
